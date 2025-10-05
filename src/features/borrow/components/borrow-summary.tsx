@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useBorrowFormContext } from '../contexts/borrow-form-context';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/card';
 import { cn } from '@/shared/utils/cn';
 
 interface BorrowSummaryProps {
@@ -40,27 +39,35 @@ export const BorrowSummary: React.FC<BorrowSummaryProps> = ({ className }) => {
 
   if (!formData.collateralToken || !formData.borrowToken) {
     return (
-      <Card className={cn('w-full max-w-md', className)}>
-        <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">
-            Select tokens to see borrow summary
+      <div className={cn('dashboard-card', className)}>
+        <div className="text-center text-muted-foreground py-8">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-sm">Select tokens to see borrow summary</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className={cn('w-full max-w-md', className)}>
-      <CardHeader>
-        <CardTitle>Borrow Summary</CardTitle>
-      </CardHeader>
+    <div className={cn('dashboard-card', className)}>
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+          <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-foreground">Borrow Summary</h3>
+      </div>
       
-      <CardContent className="space-y-4">
+      <div className="space-y-6">
         {/* Collateral Value */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Collateral Value</span>
-          <span className="font-medium">
+          <span className="font-semibold text-foreground">
             ${collateralValue.toLocaleString()}
           </span>
         </div>
@@ -68,7 +75,7 @@ export const BorrowSummary: React.FC<BorrowSummaryProps> = ({ className }) => {
         {/* Borrow Value */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Borrow Value</span>
-          <span className="font-medium">
+          <span className="font-semibold text-foreground">
             ${borrowValue.toLocaleString()}
           </span>
         </div>
@@ -77,10 +84,15 @@ export const BorrowSummary: React.FC<BorrowSummaryProps> = ({ className }) => {
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Collateral Ratio</span>
           <div className="text-right">
-            <div className={cn('font-medium', getCollateralRatioColor())}>
+            <div className={cn('font-semibold', getCollateralRatioColor())}>
               {collateralRatio.toFixed(1)}%
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className={cn('text-xs px-2 py-1 rounded-full inline-block mt-1', 
+              collateralRatio === 0 ? 'bg-gray-100 text-gray-600' :
+              collateralRatio < 150 ? 'bg-error-light text-error' :
+              collateralRatio < 200 ? 'bg-warning-light text-warning' :
+              'bg-success-light text-success'
+            )}>
               {getCollateralRatioStatus()}
             </div>
           </div>
@@ -89,16 +101,21 @@ export const BorrowSummary: React.FC<BorrowSummaryProps> = ({ className }) => {
         {/* Interest Rate */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Interest Rate</span>
-          <span className="font-medium">
-            {formData.interestRateMode === 'stable' ? '3.5%' : '2.8%'} APY
-          </span>
+          <div className="text-right">
+            <span className="font-semibold text-foreground">
+              {formData.interestRateMode === 'stable' ? '3.5%' : '2.8%'} APY
+            </span>
+            <div className="text-xs text-muted-foreground">
+              {formData.interestRateMode === 'stable' ? 'Stable' : 'Variable'}
+            </div>
+          </div>
         </div>
 
         {/* Liquidation Price */}
         {formData.collateralToken.symbol === 'ETH' && (
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Liquidation Price</span>
-            <span className="font-medium">
+            <span className="font-semibold text-foreground">
               ${(collateralValue / (borrowValue * 1.25)).toFixed(0)}
             </span>
           </div>
@@ -108,23 +125,25 @@ export const BorrowSummary: React.FC<BorrowSummaryProps> = ({ className }) => {
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Health Factor</span>
           <div className="text-right">
-            <div className={cn('font-medium', isHealthy ? 'text-green-600' : 'text-red-600')}>
+            <div className={cn('font-semibold', isHealthy ? 'text-success' : 'text-error')}>
               {(collateralRatio / 150).toFixed(2)}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className={cn('text-xs px-2 py-1 rounded-full inline-block mt-1', 
+              isHealthy ? 'bg-success-light text-success' : 'bg-error-light text-error'
+            )}>
               {isHealthy ? 'Safe' : 'At Risk'}
             </div>
           </div>
         </div>
 
         {/* Divider */}
-        <div className="border-t pt-4">
+        <div className="border-t border-border pt-4">
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Estimated Fees</span>
-            <span className="font-medium">$0.00</span>
+            <span className="font-semibold text-foreground">$0.00</span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }; 

@@ -1,15 +1,80 @@
 @import "tailwindcss";
 
+@theme {
+  /* Professional Dashboard Colors */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  
+  /* Neutral Colors */
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #cbd5e1;
+  --color-gray-400: #94a3b8;
+  --color-gray-500: #64748b;
+  --color-gray-600: #475569;
+  --color-gray-700: #334155;
+  --color-gray-800: #1e293b;
+  --color-gray-900: #0f172a;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  --color-info: #3b82f6;
+  --color-info-light: #dbeafe;
+  
+  /* Theme Colors */
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f8fafc;
+  --color-muted: #64748b;
+  --color-muted-foreground: #64748b;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #0f172a;
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-primary-foreground: #ffffff;
+  
+  /* Border and Input */
+  --color-border: #e2e8f0;
+  --color-input: #f8fafc;
+  --color-ring: #3b82f6;
+  
+      /* Typography */
+      --font-family-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --font-family-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  
+  /* Spacing and Sizing */
+  --border-radius: 0.5rem;
+  --border-radius-sm: 0.25rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+  --border-radius-2xl: 1.5rem;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +87,216 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-family-sans);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-family-sans);
+  }
+
+  body {
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Better typography for headings */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+
+  /* Better typography for body text */
+  p, span, div {
+    line-height: 1.6;
+  }
+
+  /* Monospace for code and addresses */
+  code, pre, .font-mono {
+    font-family: var(--font-family-mono);
+  }
+}
+
+@layer components {
+  /* Dashboard Card Styles */
+  .dashboard-card {
+    @apply bg-surface border border-border rounded-lg shadow-sm p-6 cursor-pointer;
+  }
+  
+  .metric-card {
+    @apply bg-surface border border-border rounded-lg shadow-sm p-6 hover:shadow-md transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95;
+  }
+  
+  .metric-value {
+    @apply text-3xl font-bold text-foreground;
+  }
+  
+  .metric-label {
+    @apply text-sm font-medium text-muted-foreground;
+  }
+  
+  .metric-description {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+  
+  /* Status Badges */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .status-leading {
+    @apply bg-success-light text-success;
+  }
+  
+  .status-moderate {
+    @apply bg-warning-light text-warning;
+  }
+  
+  .status-absent {
+    @apply bg-error-light text-error;
+  }
+  
+  .status-growing {
+    @apply bg-info-light text-info;
+  }
+  
+  /* Progress Bars */
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2;
+  }
+  
+  .progress-fill {
+    @apply h-2 rounded-full transition-all duration-300;
+  }
+  
+  .progress-primary {
+    @apply bg-primary-600;
+  }
+  
+  .progress-success {
+    @apply bg-success;
+  }
+  
+  .progress-warning {
+    @apply bg-warning;
+  }
+  
+  /* Input Styles */
+  .input {
+    @apply flex h-10 w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+  }
+  
+  .input:focus-visible {
+    @apply outline-none ring-2 ring-ring;
+  }
+  
+  .input:disabled {
+    @apply cursor-not-allowed opacity-50 bg-gray-50;
+  }
+  
+  /* Tab Styles */
+  .tab-button {
+    @apply px-4 py-2 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground hover:border-gray-300 transition-colors cursor-pointer;
+  }
+  
+  .tab-button.active {
+    @apply text-primary-600 border-primary-600;
+  }
+  
+  /* Navigation Styles */
+  .nav-item {
+    @apply px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors cursor-pointer;
+  }
+  
+  .nav-item.active {
+    @apply text-primary-600 bg-primary-50;
+  }
+  
+  /* Interactive Elements */
+  .clickable {
+    @apply cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95;
+  }
+  
+  .clickable:disabled {
+    @apply cursor-not-allowed hover:scale-100 active:scale-100;
+  }
+  
+  /* Link Styles */
+  a {
+    @apply cursor-pointer transition-colors;
+  }
+  
+  a:hover {
+    @apply text-primary-600;
+  }
+  
+  /* Button-like Elements */
+  button:not(.tab-button) {
+    @apply cursor-pointer transition-all duration-200 focus:outline-none rounded-lg;
+  }
+  
+  /* Tab buttons specifically */
+  button.tab-button {
+    @apply cursor-pointer transition-colors focus:outline-none;
+  }
+  
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+  
+  button:not(.tab-button):focus,
+  button:not(.tab-button):active,
+  button:not(.tab-button):focus-visible {
+    @apply outline-none ring-0;
+  }
+  
+  button.tab-button:focus,
+  button.tab-button:active,
+  button.tab-button:focus-visible {
+    @apply outline-none;
+  }
+  
+  /* Global button reset */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  button:not(.tab-button):focus-visible {
+    @apply outline-none;
+  }
+  
+  /* Focus Styles for Interactive Elements */
+  .clickable:focus,
+  .dashboard-card:focus,
+  .metric-card:focus {
+    @apply outline-none;
+  }
+
+  /* Typography Utilities */
+  .text-display {
+    @apply text-4xl md:text-5xl font-bold tracking-tight;
+  }
+
+  .text-heading {
+    @apply text-2xl md:text-3xl font-semibold tracking-tight;
+  }
+
+  .text-subheading {
+    @apply text-lg font-medium tracking-tight;
+  }
+
+  .text-body {
+    @apply text-base leading-relaxed;
+  }
+
+  .text-caption {
+    @apply text-sm leading-normal;
+  }
+
+  .text-mono {
+    font-family: var(--font-family-mono);
+  }
 }
