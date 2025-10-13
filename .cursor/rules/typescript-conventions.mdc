@@ -1,0 +1,406 @@
+---
+globs: *.ts,*.tsx
+description: TypeScript conventions and type safety guidelines
+---
+
+# TypeScript Conventions
+
+## Type Definitions
+
+### Location
+- Feature-specific types: `features/[feature]/types.ts`
+- Shared types: `shared/types.ts`
+- Component types: Inline or `[component].types.ts` if complex
+
+### Naming Conventions
+
+```typescript
+// Interfaces for object shapes (prefer interface over type for objects)
+interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+// Type aliases for unions, primitives, or complex types
+type UserRole = 'admin' | 'user' | 'guest';
+type ID = string | number;
+
+// Props interface with "Props" suffix
+interface ButtonProps {
+  variant: 'primary' | 'secondary';
+  size: 'sm' | 'md' | 'lg';
+  onClick: () => void;
+}
+
+// Component with explicit return type
+export const Button: React.FC<ButtonProps> = ({ variant, size, onClick }) => {
+  return <button className={`btn-${variant} btn-${size}`} onClick={onClick} />;
+};
+
+// API response types with suffix
+interface UserResponse {
+  data: User;
+  message: string;
+}
+
+// DTO (Data Transfer Object) with suffix
+interface CreateUserDto {
+  email: string;
+  password: string;
+}
+```
+
+## Component Props
+
+### Basic Props
+
+```typescript
+interface CardProps {
+  title: string;
+  description?: string; // Optional
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
+}
+
+export const Card: React.FC<CardProps> = ({
+  title,
+  description,
+  children,
+  className,
+  onClick,
+}) => {
+  return (
+    <div className={className} onClick={onClick}>
+      <h3>{title}</h3>
+      {description && <p>{description}</p>}
+      {children}
+    </div>
+  );
+};
+```
+
+### Props with Generic Types
+
+```typescript
+interface ListProps<T> {
+  items: T[];
+  renderItem: (item: T) => React.ReactNode;
+  keyExtractor: (item: T) => string;
+}
+
+export const List = <T,>({ items, renderItem, keyExtractor }: ListProps<T>) => {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={keyExtractor(item)}>{renderItem(item)}</li>
+      ))}
+    </ul>
+  );
+};
+```
+
+### Props Extending HTML Elements
+
+```typescript
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary';
+  isLoading?: boolean;
+}
+
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  isLoading = false,
+  children,
+  className,
+  disabled,
+  ...rest
+}) => {
+  return (
+    <button
+      className={`btn btn-${variant} ${className}`}
+      disabled={disabled || isLoading}
+      {...rest}
+    >
+      {isLoading ? 'Loading...' : children}
+    </button>
+  );
+};
+```
+
+## Hooks Typing
+
+### Custom Hook with Return Type
+
+```typescript
+interface UseBorrowFormReturn {
+  formData: BorrowFormData;
+  validation: ValidationResult;
+  isSubmitting: boolean;
+  updateField: (field: keyof BorrowFormData, value: any) => void;
+  submitForm: () => Promise<void>;
+}
+
+export const useBorrowForm = (): UseBorrowFormReturn => {
+  const [formData, setFormData] = useState<BorrowFormData>(initialData);
+  
+  const updateField = useCallback((
+    field: keyof BorrowFormData,
+    value: any
+  ) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+  
+  return {
+    formData,
+    validation,
+    isSubmitting,
+    updateField,
+    submitForm,
+  };
+};
+```
+
+### Generic Hooks
+
+```typescript
+export const useLocalStorage = <T,>(
+  key: string,
+  initialValue: T
+): [T, (value: T) => void] => {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: T) => {
+    setStoredValue(value);
+    window.localStorage.setItem(key, JSON.stringify(value));
+  };
+
+  return [storedValue, setValue];
+};
+```
+
+## API & Services
+
+### Service Class with Typed Methods
+
+```typescript
+// types.ts
+export interface InterestRateResponse {
+  stable: number;
+  variable: number;
+  utilizationRate: number;
+}
+
+export interface CreatePositionDto {
+  userAddress: string;
+  collateralToken: string;
+  collateralAmount: string;
+  borrowToken: string;
+  borrowAmount: string;
+  interestRateMode: 'stable' | 'variable';
+}
+
+export interface BorrowPosition {
+  id: string;
+  userAddress: string;
+  collateralAmount: string;
+  borrowAmount: string;
+  healthFactor: number;
+  createdAt: Date;
+}
+
+// service.ts
+export class BorrowApiService {
+  private static baseUrl = APP_CONFIG.api.baseUrl;
+
+  static async getInterestRates(
+    tokenAddress: string
+  ): Promise<InterestRateResponse> {
+    const response = await fetch(
+      `${this.baseUrl}/interest-rates/${tokenAddress}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch interest rates');
+    }
+    
+    return response.json();
+  }
+
+  static async createPosition(
+    data: CreatePositionDto
+  ): Promise<BorrowPosition> {
+    const response = await fetch(`${this.baseUrl}/positions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to create position');
+    }
+    
+    return response.json();
+  }
+}
+```
+
+## Utility Types
+
+### Common Utility Types
+
+```typescript
+// Make all properties optional
+type PartialUser = Partial<User>;
+
+// Make all properties required
+type RequiredUser = Required<User>;
+
+// Pick specific properties
+type UserCredentials = Pick<User, 'email' | 'password'>;
+
+// Omit specific properties
+type UserWithoutPassword = Omit<User, 'password'>;
+
+// Extract from union type
+type PrimaryVariant = Extract<'primary' | 'secondary' | 'ghost', 'primary'>;
+
+// Exclude from union type
+type NonPrimaryVariants = Exclude<'primary' | 'secondary' | 'ghost', 'primary'>;
+
+// Record type
+type UserMap = Record<string, User>;
+
+// Return type of function
+const getUser = () => ({ id: '1', name: 'John' });
+type UserReturnType = ReturnType<typeof getUser>;
+
+// Parameters of function
+type GetUserParams = Parameters<typeof getUser>;
+```
+
+### Custom Utility Types
+
+```typescript
+// Make specific properties optional
+type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+// Example usage:
+type UserFormData = Optional<User, 'id' | 'createdAt'>;
+
+// Make specific properties required
+type RequiredKeys<T, K extends keyof T> = T & Required<Pick<T, K>>;
+
+// Deep partial
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+```
+
+## Type Guards
+
+```typescript
+// Type guard function
+export const isUser = (value: unknown): value is User => {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'email' in value
+  );
+};
+
+// Usage
+const processUser = (data: unknown) => {
+  if (isUser(data)) {
+    // TypeScript knows data is User here
+    console.log(data.email);
+  }
+};
+
+// Discriminated unions
+type LoadingState = { status: 'loading' };
+type SuccessState = { status: 'success'; data: User };
+type ErrorState = { status: 'error'; error: string };
+
+type RequestState = LoadingState | SuccessState | ErrorState;
+
+const renderState = (state: RequestState) => {
+  switch (state.status) {
+    case 'loading':
+      return <Spinner />;
+    case 'success':
+      return <UserCard user={state.data} />;
+    case 'error':
+      return <ErrorMessage message={state.error} />;
+  }
+};
+```
+
+## Const Assertions
+
+```typescript
+// Use 'as const' for literal types
+export const ROUTES = {
+  HOME: '/',
+  BORROW: '/borrow',
+  POSITIONS: '/positions',
+} as const;
+
+type Routes = typeof ROUTES[keyof typeof ROUTES]; // '/' | '/borrow' | '/positions'
+
+// Use 'as const' for arrays
+export const SUPPORTED_CHAINS = [1, 137, 42161, 10] as const;
+type ChainId = typeof SUPPORTED_CHAINS[number]; // 1 | 137 | 42161 | 10
+```
+
+## Type-Safe Event Handlers
+
+```typescript
+interface FormElements extends HTMLFormControlsCollection {
+  email: HTMLInputElement;
+  password: HTMLInputElement;
+}
+
+interface LoginFormElement extends HTMLFormElement {
+  readonly elements: FormElements;
+}
+
+export const LoginForm: React.FC = () => {
+  const handleSubmit = (event: React.FormEvent<LoginFormElement>) => {
+    event.preventDefault();
+    const { email, password } = event.currentTarget.elements;
+    console.log(email.value, password.value); // Type-safe access
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="email" type="email" />
+      <input name="password" type="password" />
+      <button type="submit">Login</button>
+    </form>
+  );
+};
+```
+
+## Best Practices
+
+- ✅ Always type function parameters and return values
+- ✅ Use `interface` for object shapes that might be extended
+- ✅ Use `type` for unions, intersections, and mapped types
+- ✅ Prefer explicit types over implicit
+- ✅ Use `unknown` instead of `any` when type is truly unknown
+- ✅ Create reusable utility types for common patterns
+- ✅ Use discriminated unions for state management
+- ✅ Export types alongside components/functions
+- ❌ Avoid `any` type unless absolutely necessary
+- ❌ Don't over-use type assertions (`as`)
+- ❌ Don't create overly complex type hierarchies

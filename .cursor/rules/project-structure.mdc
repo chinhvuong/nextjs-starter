@@ -1,0 +1,176 @@
+---
+alwaysApply: true
+description: Project structure and architectural guidelines for the DeFi Borrow App
+---
+
+# Project Structure & Architecture
+
+## Core Structure
+
+This is a Next.js 14 App Router project with TypeScript, Tailwind CSS 4, and feature-based architecture.
+
+### Directory Organization
+
+```
+src/
+├── app/                    # Next.js App Router pages (routing only)
+├── features/              # Feature-based modules (business logic)
+├── shared/                # Shared components, hooks, utils, anything can share between features, modules
+├── config/                # Application configuration
+├── contracts/             # Smart contract ABIs and utilities
+├── store/                 # Redux store (use sparingly)
+└── types/                 # Global TypeScript definitions
+```
+
+## Feature-Based Architecture
+
+Each feature should follow this structure:
+
+```
+features/
+└── [feature-name]/
+    ├── index.tsx                    # Feature entry point (barrel export)
+    ├── [feature-name]-page.tsx      # Main page component
+    ├── schemas.ts                   # Zod validation schemas for forms
+    ├── components/                  # Feature-specific components
+    │   └── [component-name]/        # Component folder structure
+    │       ├── index.tsx            # Component entry and export
+    │       ├── [component].tsx      # Main component file
+    │       └── [component].types.ts # Component-specific types
+    ├── hooks/                       # Feature-specific hooks
+    │   ├── use-[hook-name].ts
+    │   └── index.ts                 # Barrel export
+    ├── contexts/                    # React Context for non-form state
+    │   └── [feature]-context.tsx
+    ├── services/                    # API calls and business logic
+    │   ├── [service-name].service.ts
+    │   └── index.ts
+    ├── types.ts                     # Feature TypeScript types
+    └── constants.ts                 # Feature constants
+```
+
+## File Organization Rules
+
+### Component Structure
+
+Always use directory-based components for maintainability:
+
+**✅ CORRECT:**
+```
+components/
+└── hero-section/
+    ├── index.tsx
+    ├── hero-section.tsx
+    ├── hero-section.types.ts
+    └── hero-content.tsx
+```
+
+**❌ INCORRECT:**
+```
+components/
+└── hero-section.tsx  # Single file - hard to break down later
+```
+
+### Routing
+
+- `app/` directory is for routing ONLY
+- Page components should import from `features/`
+- Keep route files minimal (< 50 lines)
+
+**Example:**
+```typescript
+// app/borrow/page.tsx
+import { BorrowPage } from '@/features/borrow/borrow-page';
+
+export default function BorrowRoute() {
+  return <BorrowPage />;
+}
+```
+
+## File Size Limits
+
+- **Maximum 500 lines per file**
+- If a file exceeds 500 lines, break it into smaller modules
+- Use directory structure to organize related files
+- Extract reusable logic into separate utilities
+
+## Import Organization
+
+```typescript
+// 1. External dependencies
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+// 2. Internal features
+import { BorrowForm } from '@/features/borrow/components';
+
+// 3. Shared components
+import { Button, Card } from '@/shared/components';
+
+// 4. Utilities and types
+import { cn } from '@/shared/utils';
+import type { BorrowFormData } from './types';
+
+// 5. Styles (if any)
+import './styles.css';
+```
+
+## Component Guidelines
+
+### Export Pattern
+
+Use named exports for components:
+
+```typescript
+// ✅ CORRECT
+export const HeroSection: React.FC<HeroProps> = ({ title }) => {
+  return <section>{title}</section>;
+};
+
+// ❌ INCORRECT
+export default function HeroSection({ title }) {
+  return <section>{title}</section>;
+}
+```
+
+### Component Organization
+
+```typescript
+// 1. Imports
+import { useState } from 'react';
+
+// 2. Types
+interface Props {
+  title: string;
+}
+
+// 3. Component
+export const Component: React.FC<Props> = ({ title }) => {
+  // 4. State
+  const [state, setState] = useState();
+  
+  // 5. Hooks
+  const data = useCustomHook();
+  
+  // 6. Handlers
+  const handleClick = () => {};
+  
+  // 7. Effects
+  useEffect(() => {}, []);
+  
+  // 8. Render helpers
+  const renderContent = () => {};
+  
+  // 9. Return JSX
+  return <div>{title}</div>;
+};
+```
+
+## Quick Reference
+
+- **File limit:** 500 lines maximum
+- **Component structure:** Always use directory-based organization
+- **Exports:** Named exports preferred
+- **State management:** Context API for features, Redux for global only
+- **API calls:** React Query (TanStack Query) required
+- **Hooks:** Feature-specific hooks in `features/[name]/hooks/`
