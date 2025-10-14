@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useBorrowFormContext } from '../contexts/borrow-form-context';
+import { useBorrowFormContext } from '../../contexts/borrow-form-context';
 import { cn } from '@/shared/utils/cn';
 
 interface CollateralInputProps {

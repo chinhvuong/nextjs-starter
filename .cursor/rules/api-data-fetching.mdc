@@ -1,0 +1,310 @@
+---
+alwaysApply: true
+description: API calls and data fetching patterns using React Query
+---
+
+# API Calls & Data Fetching
+
+## React Query (TanStack Query) Required
+
+**All API calls MUST use React Query** for data fetching, caching, and state management.
+
+## Setup
+
+Install React Query if not already installed:
+```bash
+npm install @tanstack/react-query
+```
+
+## API Service Layer
+
+### Service File Structure
+
+Create service files in `features/[feature]/services/`:
+
+```typescript
+// features/borrow/services/borrow-api.service.ts
+
+import { APP_CONFIG } from '@/config';
+
+const BASE_URL = APP_CONFIG.api.baseUrl;
+
+export class BorrowApiService {
+  /**
+   * Get interest rates for a specific token
+   */
+  static async getInterestRates(tokenAddress: string) {
+    const response = await fetch(`${BASE_URL}/interest-rates/${tokenAddress}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch interest rates: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create a borrow position
+   */
+  static async createBorrowPosition(data: CreateBorrowPositionDto) {
+    const response = await fetch(`${BASE_URL}/borrow/positions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create borrow position: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get user's borrow positions
+   */
+  static async getUserPositions(userAddress: string) {
+    const response = await fetch(`${BASE_URL}/borrow/positions/${userAddress}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user positions: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+}
+```
+
+## React Query Hooks
+
+### Query Hooks Pattern
+
+Create custom hooks using React Query in `features/[feature]/hooks/`:
+
+```typescript
+// features/borrow/hooks/use-interest-rates.ts
+
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
+import { BorrowApiService } from '../services/borrow-api.service';
+import type { InterestRateResponse } from '../types';
+
+export const QUERY_KEYS = {
+  interestRates: (tokenAddress: string) => ['interest-rates', tokenAddress] as const,
+  userPositions: (userAddress: string) => ['user-positions', userAddress] as const,
+  borrowLimit: (collateralAmount: number) => ['borrow-limit', collateralAmount] as const,
+};
+
+/**
+ * Hook to fetch interest rates for a specific token
+ */
+export const useInterestRates = (
+  tokenAddress: string | null,
+  options?: UseQueryOptions<InterestRateResponse>
+) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.interestRates(tokenAddress || ''),
+    queryFn: () => BorrowApiService.getInterestRates(tokenAddress!),
+    enabled: !!tokenAddress, // Only fetch when tokenAddress is available
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    retry: 3,
+    ...options,
+  });
+};
+
+/**
+ * Hook to fetch user's borrow positions
+ */
+export const useUserPositions = (userAddress: string | null) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.userPositions(userAddress || ''),
+    queryFn: () => BorrowApiService.getUserPositions(userAddress!),
+    enabled: !!userAddress,
+    staleTime: 10000, // 10 seconds
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+};
+```
+
+### Mutation Hooks Pattern
+
+```typescript
+// features/borrow/hooks/use-create-position.ts
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { BorrowApiService } from '../services/borrow-api.service';
+import { QUERY_KEYS } from './use-interest-rates';
+import type { CreateBorrowPositionDto, BorrowPosition } from '../types';
+
+/**
+ * Hook to create a new borrow position
+ */
+export const useCreateBorrowPosition = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateBorrowPositionDto) =>
+      BorrowApiService.createBorrowPosition(data),
+    
+    onMutate: async (newPosition) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: QUERY_KEYS.userPositions(newPosition.userAddress),
+      });
+
+      // Snapshot previous value
+      const previousPositions = queryClient.getQueryData(
+        QUERY_KEYS.userPositions(newPosition.userAddress)
+      );
+
+      // Optimistically update cache
+      queryClient.setQueryData(
+        QUERY_KEYS.userPositions(newPosition.userAddress),
+        (old: BorrowPosition[] = []) => [...old, newPosition]
+      );
+
+      return { previousPositions };
+    },
+
+    onError: (err, newPosition, context) => {
+      // Rollback on error
+      if (context?.previousPositions) {
+        queryClient.setQueryData(
+          QUERY_KEYS.userPositions(newPosition.userAddress),
+          context.previousPositions
+        );
+      }
+    },
+
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.userPositions(variables.userAddress),
+      });
+    },
+  });
+};
+```
+
+## Component Usage
+
+```typescript
+// features/borrow/components/position-list/position-list.tsx
+
+import { useUserPositions } from '../../hooks/use-user-positions';
+
+export const PositionList: React.FC<{ userAddress: string }> = ({ userAddress }) => {
+  const {
+    data: positions,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useUserPositions(userAddress);
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (isError) {
+    return (
+      <ErrorMessage 
+        message={error.message} 
+        onRetry={refetch}
+      />
+    );
+  }
+
+  return (
+    <div>
+      {positions?.map(position => (
+        <PositionCard key={position.id} position={position} />
+      ))}
+    </div>
+  );
+};
+```
+
+## Hook Naming Convention
+
+Feature-specific hooks should follow this pattern:
+
+- **Queries:** `use[Resource][Action]` 
+  - `useUserPositions`
+  - `useInterestRates`
+  - `useBorrowLimit`
+
+- **Mutations:** `use[Action][Resource]`
+  - `useCreatePosition`
+  - `useUpdatePosition`
+  - `useDeletePosition`
+
+- **Business Logic:** `use[Feature][Logic]`
+  - `useBorrowForm`
+  - `useCollateralCalculation`
+  - `usePositionHealth`
+
+## Query Keys
+
+Define all query keys in a centralized constant:
+
+```typescript
+export const QUERY_KEYS = {
+  // Borrow feature
+  borrow: {
+    all: ['borrow'] as const,
+    positions: (userId: string) => ['borrow', 'positions', userId] as const,
+    rates: (tokenId: string) => ['borrow', 'rates', tokenId] as const,
+  },
+  
+  // User feature
+  user: {
+    all: ['user'] as const,
+    profile: (userId: string) => ['user', 'profile', userId] as const,
+    settings: (userId: string) => ['user', 'settings', userId] as const,
+  },
+};
+```
+
+## Error Handling
+
+```typescript
+export const useInterestRates = (tokenAddress: string | null) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.interestRates(tokenAddress || ''),
+    queryFn: () => BorrowApiService.getInterestRates(tokenAddress!),
+    enabled: !!tokenAddress,
+    retry: (failureCount, error) => {
+      // Don't retry on 404
+      if (error.message.includes('404')) return false;
+      return failureCount < 3;
+    },
+    throwOnError: false, // Handle errors in component
+  });
+};
+```
+
+## Quick Rules
+
+- ✅ Always use React Query for API calls
+- ✅ Create service classes for API endpoints
+- ✅ Create custom hooks wrapping useQuery/useMutation
+- ✅ Define query keys in constants
+- ✅ Use optimistic updates for better UX
+- ✅ Handle loading and error states in components
+- ✅ Enable/disable queries based on dependencies
+- ❌ Never use useEffect for data fetching
+- ❌ Never use useState for server state
+- ❌ Don't put API logic directly in components

@@ -1,0 +1,410 @@
+---
+alwaysApply: true
+description: General coding standards and best practices
+---
+
+# Coding Standards
+
+## File Size Limit
+
+**CRITICAL: Maximum 500 lines per file**
+
+When a file approaches or exceeds 500 lines:
+1. Extract reusable logic into utility functions
+2. Split large components into smaller sub-components
+3. Move business logic to services or hooks
+4. Use the directory structure to organize related files
+
+### Example Refactoring
+
+```typescript
+// ❌ BAD - 800 lines in one file
+// features/borrow/components/borrow-form.tsx (800 lines)
+
+// ✅ GOOD - Split into smaller files
+// features/borrow/components/borrow-form/
+//   ├── index.tsx (50 lines)
+//   ├── borrow-form.tsx (200 lines)
+//   ├── collateral-section.tsx (150 lines)
+//   ├── borrow-section.tsx (150 lines)
+//   ├── summary-section.tsx (100 lines)
+//   ├── validation.ts (80 lines)
+//   └── types.ts (50 lines)
+```
+
+## Code Organization
+
+### Import Order
+
+```typescript
+// 1. React and Next.js
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+
+// 2. External libraries
+import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
+
+// 3. Internal features
+import { BorrowService } from '@/features/borrow/services';
+import { useBorrowForm } from '@/features/borrow/hooks';
+
+// 4. Shared components and hooks
+import { Button, Card } from '@/shared/components';
+import { useWallet } from '@/shared/hooks';
+
+// 5. Config and constants
+import { APP_CONFIG } from '@/config';
+import { ROUTES } from '@/shared/constants';
+
+// 6. Utils and helpers
+import { cn } from '@/shared/utils/cn';
+import { formatCurrency } from '@/shared/utils/format';
+
+// 7. Types
+import type { BorrowFormData } from './types';
+import type { Token } from '@/shared/types';
+
+// 8. Styles
+import './styles.css';
+```
+
+### Function Order in Components
+
+```typescript
+export const Component: React.FC<Props> = (props) => {
+  // 1. Hooks (useState, useEffect, custom hooks)
+  const [state, setState] = useState();
+  const router = useRouter();
+  const { data } = useCustomHook();
+  
+  // 2. Derived state and memoized values
+  const derivedValue = useMemo(() => compute(state), [state]);
+  
+  // 3. Event handlers
+  const handleClick = useCallback(() => {
+    // Handler logic
+  }, []);
+  
+  const handleSubmit = useCallback(async (e: FormEvent) => {
+    e.preventDefault();
+    // Submit logic
+  }, []);
+  
+  // 4. Effects
+  useEffect(() => {
+    // Effect logic
+  }, []);
+  
+  // 5. Early returns
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  if (!data) return null;
+  
+  // 6. Render helpers
+  const renderContent = () => {
+    return <div>{/* Complex rendering */}</div>;
+  };
+  
+  // 7. Main return
+  return (
+    <div>
+      {renderContent()}
+    </div>
+  );
+};
+```
+
+## Naming Conventions
+
+### Files and Folders
+
+```
+// Components (kebab-case)
+hero-section/
+  ├── index.tsx
+  ├── hero-section.tsx
+  └── hero-section.types.ts
+
+// Hooks (kebab-case with use- prefix)
+use-borrow-form.ts
+use-wallet-connection.ts
+
+// Services (kebab-case with .service suffix)
+borrow-api.service.ts
+user-api.service.ts
+
+// Utils (kebab-case)
+format-currency.ts
+validate-email.ts
+
+// Types (kebab-case)
+borrow-types.ts
+user-types.ts
+
+// Constants (SCREAMING_SNAKE_CASE for file if all constants)
+constants.ts (or ROUTES.ts if specific)
+```
+
+### Variables and Functions
+
+```typescript
+// Variables - camelCase
+const userName = 'John';
+const isLoading = false;
+const userAge = 25;
+
+// Functions - camelCase, verb prefix
+const getUserData = () => {};
+const handleSubmit = () => {};
+const calculateTotal = () => {};
+const validateForm = () => {};
+
+// Boolean variables - is/has/should prefix
+const isValid = true;
+const hasError = false;
+const shouldRender = true;
+const canSubmit = false;
+
+// Constants - SCREAMING_SNAKE_CASE
+const MAX_RETRY_COUNT = 3;
+const API_BASE_URL = 'https://api.example.com';
+const DEFAULT_TIMEOUT = 5000;
+
+// React Components - PascalCase
+const UserProfile = () => {};
+const BorrowForm = () => {};
+const MetricCard = () => {};
+
+// Types and Interfaces - PascalCase
+interface User {}
+type UserRole = string;
+interface ButtonProps {}
+```
+
+## Error Handling
+
+### Try-Catch Pattern
+
+```typescript
+const fetchUserData = async (userId: string) => {
+  try {
+    const response = await fetch(`/api/users/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return { data, error: null };
+  } catch (error) {
+    console.error('Failed to fetch user data:', error);
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+};
+```
+
+### React Query Error Handling
+
+```typescript
+const { data, isError, error } = useQuery({
+  queryKey: ['user', userId],
+  queryFn: () => fetchUser(userId),
+  retry: (failureCount, error) => {
+    // Don't retry on 404
+    if (error.message.includes('404')) return false;
+    return failureCount < 3;
+  },
+});
+
+if (isError) {
+  return <ErrorMessage message={error.message} />;
+}
+```
+
+## Performance Best Practices
+
+### 1. Memoization
+
+```typescript
+// ✅ Memoize expensive calculations
+const expensiveValue = useMemo(() => {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}, [items]);
+
+// ✅ Memoize callbacks
+const handleClick = useCallback(() => {
+  console.log('Clicked');
+}, []);
+
+// ✅ Memoize components
+const MemoizedComponent = memo(ExpensiveComponent);
+```
+
+### 2. Lazy Loading
+
+```typescript
+// Lazy load routes
+const BorrowPage = lazy(() => import('@/features/borrow/borrow-page'));
+
+// Lazy load heavy components
+const Chart = lazy(() => import('./chart'));
+
+// Usage with Suspense
+<Suspense fallback={<LoadingSpinner />}>
+  <Chart data={data} />
+</Suspense>
+```
+
+### 3. Avoid Inline Object/Array Creation
+
+```typescript
+// ❌ BAD - Creates new object on every render
+<Component style={{ margin: 10 }} />
+
+// ✅ GOOD - Define outside or memoize
+const style = { margin: 10 };
+<Component style={style} />
+
+// ❌ BAD - Creates new array on every render
+<List items={[1, 2, 3]} />
+
+// ✅ GOOD - Define outside
+const items = [1, 2, 3];
+<List items={items} />
+```
+
+## Accessibility
+
+### Always Include
+
+```tsx
+// Labels for inputs
+<label htmlFor="email">Email</label>
+<input id="email" type="email" />
+
+// Alt text for images
+<Image src="/logo.png" alt="Company Logo" />
+
+// ARIA labels for icon buttons
+<button aria-label="Close modal">
+  <CloseIcon />
+</button>
+
+// Keyboard navigation
+<div 
+  role="button" 
+  tabIndex={0}
+  onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+  onClick={handleClick}
+>
+  Click Me
+</div>
+```
+
+## Comments
+
+### When to Comment
+
+```typescript
+// ✅ GOOD - Explain WHY, not WHAT
+// Use floor division to avoid floating point errors in token calculations
+const tokenAmount = Math.floor(value * 10 ** decimals);
+
+// ✅ GOOD - Document complex business logic
+/**
+ * Calculates the health factor of a borrow position
+ * Health factor < 1.0 means position is at risk of liquidation
+ * Formula: (collateralValue * liquidationThreshold) / borrowValue
+ */
+const calculateHealthFactor = (collateral: number, borrow: number) => {
+  return (collateral * 0.8) / borrow;
+};
+
+// ❌ BAD - Stating the obvious
+// Set the user name to 'John'
+const userName = 'John';
+
+// ❌ BAD - Commented out code (delete it instead)
+// const oldFunction = () => {
+//   // old implementation
+// };
+```
+
+### JSDoc for Functions
+
+```typescript
+/**
+ * Validates a wallet address
+ * @param address - The wallet address to validate
+ * @returns True if valid Ethereum address
+ */
+export const isValidAddress = (address: string): boolean => {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
+
+/**
+ * Formats a token amount with proper decimals
+ * @param amount - Raw token amount
+ * @param decimals - Number of decimals
+ * @param displayDecimals - Number of decimals to display (default: 4)
+ * @returns Formatted string
+ */
+export const formatTokenAmount = (
+  amount: string,
+  decimals: number,
+  displayDecimals: number = 4
+): string => {
+  // Implementation
+};
+```
+
+## Testing Mindset
+
+Write code that's easy to test:
+
+```typescript
+// ✅ GOOD - Pure function, easy to test
+export const calculateInterest = (
+  principal: number,
+  rate: number,
+  time: number
+): number => {
+  return principal * rate * time;
+};
+
+// ✅ GOOD - Separated concerns
+export const useBorrowForm = () => {
+  // Logic only
+};
+
+export const BorrowForm = () => {
+  const logic = useBorrowForm();
+  // UI only
+  return <form>{/* ... */}</form>;
+};
+
+// ❌ BAD - Mixed concerns, hard to test
+export const BorrowForm = () => {
+  // Both logic and UI tightly coupled
+};
+```
+
+## Quick Checklist
+
+Before committing code, verify:
+
+- ✅ File is under 500 lines
+- ✅ Imports are organized properly
+- ✅ TypeScript types are defined
+- ✅ Error handling is implemented
+- ✅ No console.logs (except in development)
+- ✅ No commented-out code
+- ✅ Meaningful variable and function names
+- ✅ Proper accessibility attributes
+- ✅ Responsive design considered
+- ✅ Performance optimizations applied where needed

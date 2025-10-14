@@ -1,5 +1,5 @@
 import { BorrowFormData, BorrowPosition, BorrowEstimate, InterestRateInfo } from '../types';
-import { BORROW_CONSTANTS } from '../constants';
+import { BORROW_CONSTANTS, DEFAULT_RATES } from '../constants';
 import { Token } from '@/shared/types';
 
 export class BorrowService {
@@ -37,8 +37,8 @@ export class BorrowService {
     // This would typically fetch from the lending protocol
     // For now, return default values
     return {
-      stable: BORROW_CONSTANTS.DEFAULT_STABLE_RATE,
-      variable: BORROW_CONSTANTS.DEFAULT_VARIABLE_RATE,
+      stable: DEFAULT_RATES.STABLE,
+      variable: DEFAULT_RATES.VARIABLE,
       utilizationRate: 65.5, // 65.5%
     };
   }
@@ -74,8 +74,8 @@ export class BorrowService {
       collateralRatio,
       healthFactor,
       interestRate: data.interestRateMode === 'stable' 
-        ? BORROW_CONSTANTS.DEFAULT_STABLE_RATE 
-        : BORROW_CONSTANTS.DEFAULT_VARIABLE_RATE,
+        ? DEFAULT_RATES.STABLE 
+        : DEFAULT_RATES.VARIABLE,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

@@ -1,0 +1,381 @@
+---
+globs: *.tsx,*.css
+description: Tailwind CSS 4 and styling conventions for the DeFi Borrow App
+---
+
+# Styling Conventions
+
+## Tailwind CSS 4
+
+This project uses Tailwind CSS 4 with `@theme` directive for configuration.
+
+### Theme Configuration
+
+All theme variables are defined in [src/app/globals.css](mdc:src/app/globals.css) using the `@theme` directive:
+
+```css
+@theme {
+  /* Colors */
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  
+  /* Typography */
+  --font-family-sans: var(--font-inter), sans-serif;
+  --font-family-mono: var(--font-jetbrains-mono), monospace;
+  
+  /* Spacing */
+  --border-radius: 0.5rem;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+```
+
+### Component Styles
+
+Define reusable component classes in the `@layer components` section:
+
+```css
+@layer components {
+  .dashboard-card {
+    @apply bg-surface border border-border rounded-lg shadow-sm p-6 cursor-pointer;
+  }
+  
+  .metric-card {
+    @apply bg-surface border border-border rounded-lg shadow-sm p-6 
+           hover:shadow-md transition-all duration-200 cursor-pointer 
+           hover:scale-105 active:scale-95;
+  }
+  
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+```
+
+## Styling Approach
+
+### 1. Utility-First with Tailwind
+
+Use Tailwind utilities directly in JSX for most styling:
+
+```tsx
+export const Card: React.FC<CardProps> = ({ children, className }) => {
+  return (
+    <div className={cn(
+      'bg-surface border border-border rounded-lg shadow-sm p-6',
+      'hover:shadow-md transition-shadow duration-200',
+      className
+    )}>
+      {children}
+    </div>
+  );
+};
+```
+
+### 2. Component Classes for Reusable Patterns
+
+Extract common patterns into component classes in `globals.css`:
+
+```tsx
+// ✅ GOOD - Use component class for repeated patterns
+export const MetricCard = () => (
+  <div className="metric-card">
+    <div className="metric-value">$2.4B</div>
+    <div className="metric-label">Total Value Locked</div>
+  </div>
+);
+
+// ❌ AVOID - Repeating the same long class strings
+export const MetricCard = () => (
+  <div className="bg-surface border border-border rounded-lg shadow-sm p-6 hover:shadow-md transition-all duration-200">
+    {/* ... */}
+  </div>
+);
+```
+
+### 3. cn() Utility for Conditional Classes
+
+Always use the `cn()` utility from [src/shared/utils/cn.ts](mdc:src/shared/utils/cn.ts) for merging classes:
+
+```tsx
+import { cn } from '@/shared/utils/cn';
+
+export const Button: React.FC<ButtonProps> = ({ 
+  variant = 'primary', 
+  className,
+  disabled 
+}) => {
+  return (
+    <button
+      className={cn(
+        // Base styles
+        'px-4 py-2 rounded-lg font-medium transition-all duration-200',
+        // Variant styles
+        variant === 'primary' && 'bg-primary-600 text-white hover:bg-primary-700',
+        variant === 'secondary' && 'bg-gray-200 text-gray-900 hover:bg-gray-300',
+        // State styles
+        disabled && 'opacity-50 cursor-not-allowed',
+        // Custom className from props
+        className
+      )}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+```
+
+## Typography
+
+### Font Configuration
+
+Fonts are configured in [src/app/layout.tsx](mdc:src/app/layout.tsx):
+
+```typescript
+import { Inter, JetBrains_Mono } from 'next/font/google';
+
+const inter = Inter({ 
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
+```
+
+### Typography Utilities
+
+Use the predefined typography classes:
+
+```tsx
+// Display text - Large headings
+<h1 className="text-display text-foreground">DeFi Dashboard</h1>
+
+// Heading text - Section titles
+<h2 className="text-heading text-foreground">Key Metrics</h2>
+
+// Subheading text - Subsection titles
+<h3 className="text-subheading text-foreground">Total Value Locked</h3>
+
+// Body text - Paragraphs
+<p className="text-body text-muted-foreground">Description text here</p>
+
+// Caption text - Small labels
+<span className="text-caption text-muted-foreground">Last updated</span>
+
+// Monospace text - Addresses, code
+<code className="text-mono text-foreground">0x1234...5678</code>
+```
+
+## Color System
+
+### Semantic Colors
+
+Use semantic color names defined in the theme:
+
+```tsx
+// ✅ GOOD - Semantic colors
+<div className="bg-surface text-foreground border-border">
+<span className="text-primary-600">Primary action</span>
+<span className="text-success">Success message</span>
+<span className="text-error">Error message</span>
+
+// ❌ AVOID - Direct color values
+<div className="bg-white text-black border-gray-200">
+<span className="text-blue-600">Action</span>
+```
+
+### Color Categories
+
+- **Brand Colors**: `primary-*` (50-900)
+- **Neutral Colors**: `gray-*` (50-900)
+- **Status Colors**: `success`, `warning`, `error`, `info`
+- **Semantic Colors**: `surface`, `foreground`, `muted`, `border`
+
+## Responsive Design
+
+### Breakpoints
+
+Tailwind's default breakpoints:
+- `sm`: 640px
+- `md`: 768px
+- `lg`: 1024px
+- `xl`: 1280px
+- `2xl`: 1536px
+
+### Mobile-First Approach
+
+Always use mobile-first responsive design:
+
+```tsx
+// ✅ GOOD - Mobile-first
+<div className="
+  grid grid-cols-1 gap-4
+  md:grid-cols-2 md:gap-6
+  lg:grid-cols-4 lg:gap-8
+">
+
+// ❌ AVOID - Desktop-first
+<div className="
+  grid grid-cols-4 gap-8
+  lg:grid-cols-2 lg:gap-6
+  md:grid-cols-1 md:gap-4
+">
+```
+
+## Interactive States
+
+### Buttons
+
+```tsx
+<button className="
+  px-4 py-2 rounded-lg
+  bg-primary-600 text-white
+  hover:bg-primary-700
+  active:scale-95
+  focus:outline-none focus:ring-2 focus:ring-primary-500
+  disabled:opacity-50 disabled:cursor-not-allowed
+  transition-all duration-200
+">
+  Click Me
+</button>
+```
+
+### Cards
+
+```tsx
+<div className="
+  bg-surface border border-border rounded-lg p-6
+  hover:shadow-lg hover:scale-105
+  active:scale-95
+  transition-all duration-200
+  cursor-pointer
+">
+  Card Content
+</div>
+```
+
+### Links
+
+```tsx
+<a className="
+  text-primary-600
+  hover:text-primary-700 hover:underline
+  focus:outline-none focus:ring-2 focus:ring-primary-500
+  transition-colors duration-200
+">
+  Link Text
+</a>
+```
+
+## Dark Mode Support
+
+Prepare for dark mode using semantic colors:
+
+```tsx
+// ✅ GOOD - Uses semantic colors that can adapt
+<div className="bg-surface text-foreground">
+
+// ❌ AVOID - Hard-coded light colors
+<div className="bg-white text-black">
+```
+
+## Animation & Transitions
+
+### Common Transitions
+
+```css
+/* Add to globals.css */
+@layer components {
+  .transition-smooth {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  .transition-fast {
+    @apply transition-all duration-150 ease-in-out;
+  }
+  
+  .hover-lift {
+    @apply hover:scale-105 hover:shadow-lg transition-smooth;
+  }
+}
+```
+
+### Usage
+
+```tsx
+<div className="transition-smooth hover:bg-gray-100">
+  Smooth transition
+</div>
+
+<div className="hover-lift cursor-pointer">
+  Lifts on hover
+</div>
+```
+
+## Best Practices
+
+### DO's ✅
+
+- Use `cn()` for combining classes
+- Use semantic color names from theme
+- Use component classes for repeated patterns
+- Follow mobile-first responsive design
+- Use consistent spacing scale (4, 6, 8, 12, 16, 24, 32, etc.)
+- Use transition durations: 150ms, 200ms, 300ms
+- Add focus states for accessibility
+- Use `cursor-pointer` for clickable elements
+
+### DON'Ts ❌
+
+- Don't use arbitrary values unless absolutely necessary
+- Don't repeat the same long class combinations
+- Don't use hard-coded colors (use theme colors)
+- Don't use `!important` in Tailwind classes
+- Don't create custom CSS files for individual components
+- Don't use inline styles (use Tailwind classes)
+- Don't forget hover/focus/active states
+
+## Class Organization
+
+Order classes logically for readability:
+
+```tsx
+<div className={cn(
+  // 1. Layout
+  'flex items-center justify-between',
+  // 2. Spacing
+  'p-6 gap-4',
+  // 3. Sizing
+  'w-full h-auto',
+  // 4. Typography
+  'text-base font-medium',
+  // 5. Colors
+  'bg-surface text-foreground border-border',
+  // 6. Borders & Shadows
+  'border rounded-lg shadow-sm',
+  // 7. Effects
+  'hover:shadow-md transition-all duration-200',
+  // 8. Interactivity
+  'cursor-pointer',
+  // 9. Custom classes
+  className
+)}>
+```
+
+## Quick Reference
+
+```tsx
+// Spacing: p-4, px-6, py-2, m-4, mx-auto, gap-4
+// Colors: bg-surface, text-foreground, border-border
+// Typography: text-sm, text-base, text-lg, font-medium, font-bold
+// Flex: flex, items-center, justify-between, gap-4
+// Grid: grid, grid-cols-3, gap-6
+// Borders: border, border-2, rounded-lg, rounded-full
+// Shadows: shadow-sm, shadow, shadow-md, shadow-lg
+// Transitions: transition-all, duration-200, hover:scale-105
+```

@@ -1,0 +1,262 @@
+---
+alwaysApply: true
+description: Project structure and architectural guidelines for the DeFi Borrow App
+---
+
+# Project Structure & Architecture
+
+## Core Structure
+
+This is a Next.js 14 App Router project with TypeScript, Tailwind CSS 4, and feature-based architecture.
+
+### Directory Organization
+
+```
+src/
+├── app/                    # Next.js App Router pages (routing only)
+├── features/              # Feature-based modules (business logic)
+├── shared/                # Shared components, hooks, utils, anything can share between features, modules
+├── config/                # Application configuration
+├── contracts/             # Smart contract ABIs and utilities
+├── store/                 # Redux store (use sparingly)
+└── types/                 # Global TypeScript definitions
+```
+
+## Feature-Based Architecture
+
+Each feature should follow this structure:
+
+```
+features/
+└── [feature-name]/
+    ├── index.tsx                    # Feature entry point (barrel export)
+    ├── [feature-name]-page.tsx      # Main page component
+    ├── components/                  # Feature-specific components
+    │   └── [component-name]/        # Component folder structure (ALWAYS)
+    │       ├── index.tsx            # Main component implementation
+    │       ├── [sub-component].tsx  # Sub-component (if complex)
+    │       └── [component].types.ts # Component-specific types (if complex)
+    ├── hooks/                       # Feature-specific hooks
+    │   ├── use-[hook-name].ts
+    │   └── index.ts                 # Barrel export
+    ├── contexts/                    # React Context for non-form state
+    │   └── [feature]-context.tsx
+    ├── services/                    # API calls and business logic
+    │   ├── [service-name].service.ts
+    │   └── index.ts
+    ├── types/                       # Feature TypeScript types (directory)
+    │   ├── index.ts                 # Barrel export
+    │   ├── [type-group].types.ts    # Grouped types
+    │   └── [another-group].types.ts
+    ├── schemas/                     # Zod validation schemas (directory)
+    │   ├── index.ts                 # Barrel export
+    │   └── [form-name].schema.ts    # Individual schemas
+    └── constants/                   # Feature constants (directory)
+        ├── index.ts                 # Barrel export
+        └── [group].constants.ts     # Grouped constants
+```
+
+## File Organization Rules
+
+### CRITICAL: Directory-Based Pattern
+
+**ALWAYS use directories for scalability, even for single files:**
+
+#### Components
+**✅ CORRECT - index.tsx is the main component:**
+```
+components/
+└── hero-section/
+    └── index.tsx              # Main component implementation
+
+# If complex, add sub-components:
+components/
+└── hero-section/
+    ├── index.tsx              # Main component
+    ├── hero-content.tsx       # Sub-component
+    └── hero-image.tsx         # Sub-component
+```
+
+**❌ INCORRECT - Never single file:**
+```
+components/
+└── hero-section.tsx  # Hard to scale later
+```
+
+**Component File Pattern:**
+
+**Simple Component** (most cases):
+```
+components/button/
+└── index.tsx          # Contains the Button component
+```
+
+**Complex Component** (when needed):
+```
+components/data-table/
+├── index.tsx          # Main DataTable component
+├── table-header.tsx   # Sub-component
+├── table-row.tsx      # Sub-component
+├── table-pagination.tsx # Sub-component
+└── types.ts           # Component-specific types
+```
+
+**Why index.tsx as main file?**
+- ✅ Start simple with just `index.tsx`
+- ✅ Add sub-components in same folder if needed
+- ✅ No need to refactor exports - just add files
+- ✅ Clean imports: `import { Button } from './button'`
+- ✅ No separate export file needed
+
+#### Types
+**✅ CORRECT - Always use directory:**
+```
+types/
+├── index.ts                   # Barrel export
+├── user.types.ts              # User-related types
+└── api.types.ts               # API-related types
+```
+
+**❌ INCORRECT - Never single file:**
+```
+types.ts  # Hard to organize when it grows
+```
+
+#### Schemas
+**✅ CORRECT - Always use directory:**
+```
+schemas/
+├── index.ts                   # Barrel export
+└── login-form.schema.ts       # Login schema
+```
+
+**❌ INCORRECT - Never single file:**
+```
+schemas.ts  # Hard to manage multiple forms
+```
+
+#### Constants  
+**✅ CORRECT - Always use directory:**
+```
+constants/
+├── index.ts                   # Barrel export
+├── api.constants.ts           # API constants
+└── validation.constants.ts    # Validation constants
+```
+
+**❌ INCORRECT - Never single file:**
+```
+constants.ts  # Gets too long quickly
+```
+
+### Why Directories Always?
+
+- ✅ **Future-proof**: Easy to add new files without refactoring
+- ✅ **Organized**: Related code stays together
+- ✅ **500-line limit**: Never hit the limit per file
+- ✅ **Scalable**: Grows naturally with the project
+- ✅ **Clear imports**: Barrel exports keep imports clean
+
+### Routing
+
+- `app/` directory is for routing ONLY
+- Page components should import from `features/`
+- Keep route files minimal (< 50 lines)
+
+**Example:**
+```typescript
+// app/borrow/page.tsx
+import { BorrowPage } from '@/features/borrow/borrow-page';
+
+export default function BorrowRoute() {
+  return <BorrowPage />;
+}
+```
+
+## File Size Limits
+
+- **Maximum 500 lines per file**
+- If a file exceeds 500 lines, break it into smaller modules
+- Use directory structure to organize related files
+- Extract reusable logic into separate utilities
+
+## Import Organization
+
+```typescript
+// 1. External dependencies
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+// 2. Internal features
+import { BorrowForm } from '@/features/borrow/components';
+
+// 3. Shared components
+import { Button, Card } from '@/shared/components';
+
+// 4. Utilities and types
+import { cn } from '@/shared/utils';
+import type { BorrowFormData } from './types';
+
+// 5. Styles (if any)
+import './styles.css';
+```
+
+## Component Guidelines
+
+### Export Pattern
+
+Use named exports for components:
+
+```typescript
+// ✅ CORRECT
+export const HeroSection: React.FC<HeroProps> = ({ title }) => {
+  return <section>{title}</section>;
+};
+
+// ❌ INCORRECT
+export default function HeroSection({ title }) {
+  return <section>{title}</section>;
+}
+```
+
+### Component Organization
+
+```typescript
+// 1. Imports
+import { useState } from 'react';
+
+// 2. Types
+interface Props {
+  title: string;
+}
+
+// 3. Component
+export const Component: React.FC<Props> = ({ title }) => {
+  // 4. State
+  const [state, setState] = useState();
+  
+  // 5. Hooks
+  const data = useCustomHook();
+  
+  // 6. Handlers
+  const handleClick = () => {};
+  
+  // 7. Effects
+  useEffect(() => {}, []);
+  
+  // 8. Render helpers
+  const renderContent = () => {};
+  
+  // 9. Return JSX
+  return <div>{title}</div>;
+};
+```
+
+## Quick Reference
+
+- **File limit:** 500 lines maximum
+- **Component structure:** Always use directory-based organization
+- **Exports:** Named exports preferred
+- **State management:** Context API for features, Redux for global only
+- **API calls:** React Query (TanStack Query) required
+- **Hooks:** Feature-specific hooks in `features/[name]/hooks/`

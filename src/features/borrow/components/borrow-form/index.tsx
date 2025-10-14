@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { useBorrowFormContext } from '../contexts/borrow-form-context';
-import { TokenSelector } from './token-selector';
-import { CollateralInput } from './collateral-input';
+import { useBorrowFormContext } from '../../contexts/borrow-form-context';
+import { TokenSelector } from '../token-selector';
+import { CollateralInput } from '../collateral-input';
 import { Button } from '@/shared/components/button';
 import { cn } from '@/shared/utils/cn';
 
