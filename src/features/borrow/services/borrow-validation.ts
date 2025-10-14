@@ -1,5 +1,5 @@
 import { BorrowFormData, BorrowValidationResult } from '../types';
-import { BORROW_CONSTANTS } from '../constants';
+import { BORROW_CONSTANTS, BORROW_LIMITS } from '../constants';
 import { Token } from '@/shared/types';
 
 export class BorrowValidationService {
@@ -28,13 +28,13 @@ export class BorrowValidationService {
 
     // Validate minimum borrow amount
     const borrowAmount = parseFloat(data.borrowAmount);
-    if (borrowAmount < parseFloat(BORROW_CONSTANTS.MIN_BORROW_AMOUNT)) {
-      errors.push(`Minimum borrow amount is $${BORROW_CONSTANTS.MIN_BORROW_AMOUNT}`);
+    if (borrowAmount < parseFloat(BORROW_LIMITS.MIN_BORROW_AMOUNT)) {
+      errors.push(`Minimum borrow amount is $${BORROW_LIMITS.MIN_BORROW_AMOUNT}`);
     }
 
     // Validate maximum borrow amount
-    if (borrowAmount > parseFloat(BORROW_CONSTANTS.MAX_BORROW_AMOUNT)) {
-      errors.push(`Maximum borrow amount is $${BORROW_CONSTANTS.MAX_BORROW_AMOUNT}`);
+    if (borrowAmount > parseFloat(BORROW_LIMITS.MAX_BORROW_AMOUNT)) {
+      errors.push(`Maximum borrow amount is $${BORROW_LIMITS.MAX_BORROW_AMOUNT}`);
     }
 
     // Validate collateral ratio

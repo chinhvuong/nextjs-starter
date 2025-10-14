@@ -10,7 +10,6 @@ Create a well-structured pull request with proper description, labels, and revie
    - Summarize changes clearly
    - Include context and motivation
    - List any breaking changes
-   - Add screenshots if UI changes
 3. **Set up PR**
    - Create PR with descriptive title
    - Add appropriate labels

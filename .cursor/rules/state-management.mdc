@@ -29,12 +29,12 @@ Install dependencies:
 npm install react-hook-form zod @hookform/resolvers
 ```
 
-### Zod Schema File Structure
+### Zod Schema Directory Structure
 
-Create a `schemas.ts` file in each feature folder:
+Create a `schemas/` directory in each feature folder with individual schema files:
 
 ```typescript
-// features/borrow/schemas.ts
+// features/borrow/schemas/borrow-form.schema.ts
 
 import { z } from 'zod';
 
@@ -348,11 +348,21 @@ export const usernameSchema = z.string()
 ```
 features/
 └── [feature-name]/
-    ├── schemas.ts              # Zod validation schemas (for forms)
+    ├── schemas/                # Zod validation schemas (directory)
+    │   ├── index.ts
+    │   └── [form].schema.ts
+    ├── types/                  # TypeScript types (directory)
+    │   ├── index.ts
+    │   └── [group].types.ts
+    ├── constants/              # Constants (directory)
+    │   ├── index.ts
+    │   └── [group].constants.ts
     ├── contexts/               # Context for non-form state only
     ├── hooks/                  # Custom hooks
-    ├── components/             # Feature components
-    └── types.ts                # TypeScript types
+    └── components/             # Feature components (always directories)
+        └── [component]/
+            ├── index.tsx
+            └── [component].tsx
 ```
 
 ### Context Pattern
@@ -758,14 +768,22 @@ const user = useSelector(selectUser);
 
 ```
 features/borrow/
-├── schemas.ts                  # ✅ Zod schemas for forms
-├── components/
+├── schemas/                    # ✅ Zod schemas (directory)
+│   ├── index.ts
+│   └── borrow-form.schema.ts
+├── types/                      # ✅ Types (directory)
+│   ├── index.ts
+│   └── borrow-form.types.ts
+├── constants/                  # ✅ Constants (directory)
+│   ├── index.ts
+│   └── borrow.constants.ts
+├── components/                 # ✅ Always directories
 │   └── borrow-form/
-│       └── borrow-form.tsx     # Uses React Hook Form
+│       ├── index.tsx
+│       └── borrow-form.tsx
 ├── hooks/
 │   ├── use-borrow-form.ts      # Custom form hook
 │   └── use-borrow-data.ts      # React Query hook
-├── contexts/
-│   └── borrow-ui-context.tsx   # For non-form UI state only
-└── types.ts
+└── contexts/
+    └── borrow-ui-context.tsx   # For non-form UI state only
 ```
