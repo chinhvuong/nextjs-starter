@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import './globals.css';
 import { ReduxProvider } from '@/store/provider';
 
@@ -23,19 +25,24 @@ export const metadata: Metadata = {
   viewport: 'width=device-width, initial-scale=1',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="font-inter antialiased">
-        <ReduxProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            {children}
-          </div>
-        </ReduxProvider>
+        <NextIntlClientProvider messages={messages}>
+          <ReduxProvider>
+            <div className="min-h-screen bg-background text-foreground">
+              {children}
+            </div>
+          </ReduxProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

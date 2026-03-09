@@ -1,0 +1,38 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "submit": "Submit",
+    "connect": "Connect"
+  },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "balance": "Balance",
+    "address": "Address",
+    "notConnected": "Wallet not connected"
+  },
+  "borrow": {
+    "title": "Borrow",
+    "collateral": "Collateral",
+    "amount": "Amount",
+    "interestRate": "Interest Rate",
+    "interestRateMode": {
+      "stable": "Stable",
+      "variable": "Variable"
+    },
+    "summary": "Borrow Summary",
+    "healthFactor": "Health Factor",
+    "liquidationThreshold": "Liquidation Threshold",
+    "collateralRatio": "Collateral Ratio",
+    "borrowLimit": "Borrow Limit",
+    "errors": {
+      "insufficientCollateral": "Insufficient collateral",
+      "exceedsBorrowLimit": "Amount exceeds borrow limit",
+      "invalidAmount": "Invalid amount"
+    }
+  }
+}
