@@ -1,0 +1,47 @@
+---
+description: Design system usage - components, tokens, and conventions to avoid hardcoding
+globs: "**/*.tsx,**/*.css"
+alwaysApply: false
+---
+
+# Design System Integration
+
+Use project design tokens and components consistently. Avoid hardcoding values.
+
+## Component Usage
+
+- **IMPORTANT**: Always use components from `@/shared/components` when possible.
+- **Button**: `Button` from `@/shared/components/button` — variants: `primary`, `secondary`, `outline`, `ghost`, `destructive`.
+- **Card**: `Card`, `CardHeader`, `CardTitle`, `CardContent`, `CardFooter` from `@/shared/components/card`.
+- **Modal**: `Modal` from `@/shared/components/modal`.
+- Place new shared UI in `src/shared/components/[component-name]/` with `index.tsx`.
+- Feature-specific UI goes in `src/features/[feature]/components/[component-name]/`.
+
+## Design Tokens (No Hardcoding)
+
+All tokens live in `src/app/globals.css` via `@theme`. Use these, never raw hex or arbitrary values:
+
+| Category | Use | Avoid |
+|----------|-----|-------|
+| **Colors** | `bg-surface`, `text-foreground`, `text-muted-foreground`, `border-border`, `text-primary-600`, `text-success`, `text-error`, `text-warning` | `bg-white`, `text-black`, `#3b82f6` |
+| **Typography** | `text-display`, `text-heading`, `text-body`, `text-caption`, `text-mono` | Arbitrary `text-[14px]`, `font-[500]` |
+| **Spacing** | `p-4`, `gap-6`, `rounded-lg` (theme `--border-radius`) | `p-[13px]`, `rounded-[7px]` |
+| **Component classes** | `dashboard-card`, `metric-card`, `status-badge`, `input`, `tab-button` | Repeating long class strings |
+
+## Icons & Assets
+
+- Icons: `src/assets/icons/` — export in `src/assets/icons/index.ts`. Use: `import { CloseIcon } from '@/assets/icons';`
+- Logos: `src/assets/logos/` — reference via path or Next.js `Image`.
+- **DO NOT** add new icon packages. Use Figma-provided assets or existing project icons.
+- Use `cn()` from `@/shared/utils/cn` for merging `className`.
+
+## Accessibility
+
+- Follow WCAG: labels for inputs, `alt` for images, `aria-label` for icon-only buttons.
+- Use semantic HTML and focus states (`focus:ring-2 focus:ring-ring`).
+
+## Layout Primitives
+
+- Flex: `flex`, `flex-col`, `items-center`, `justify-between`, `gap-4`.
+- Grid: `grid`, `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`, `gap-6`.
+- Mobile-first: base styles for mobile, then `md:`, `lg:` for larger screens.
