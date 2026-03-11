@@ -2,6 +2,48 @@
 
 Detailed mapping for converting Figma designs to this codebase.
 
+## Asset Export Workflow (Framelink MCP)
+
+### download_figma_images Parameters
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `fileKey` | Yes | Figma file key from URL |
+| `nodes` | Yes | Array of `{ nodeId, fileName, imageRef?, needsCropping?, ... }` |
+| `localPath` | Yes | Absolute path: `src/assets/icons/` or `src/assets/logos/` |
+| `pngScale` | No | Export scale for PNG (default: 2) |
+
+### Node Format
+
+```json
+{
+  "nodeId": "1234:5678",
+  "fileName": "close.svg",
+  "imageRef": ""
+}
+```
+
+- **SVG icons**: `imageRef` empty; `fileName` ends with `.svg`
+- **Raster images**: Include `imageRef` from Figma data; `fileName` ends with `.png`
+
+### Icon Export Pattern
+
+After download, add to `src/assets/icons/index.ts`:
+
+```ts
+export { default as NewIconName } from './new-icon.svg';
+```
+
+Import: `import { NewIconName } from '@/assets/icons';`
+
+### Image Optimization Summary
+
+| Asset Type | Action | WebP |
+|------------|--------|------|
+| SVG icons | Use as-is | N/A (vector) |
+| PNG/JPG | Use `next/image` | Auto via Next.js |
+| Static PNG | Prefer `next/image`; else convert with sharp | Optional |
+
 ## Theme Colors (globals.css)
 
 | Figma Color | Tailwind Class | Usage |
