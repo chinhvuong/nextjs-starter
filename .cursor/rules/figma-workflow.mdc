@@ -1,0 +1,250 @@
+---
+description: Core conventions for Figma-to-code conversion. Applies to all design implementation tasks.
+alwaysApply: true
+---
+
+# Figma-to-Code Workflow Conventions
+
+## 1. Fluid Typography System (vw/rem)
+
+The site uses a viewport-relative rem system:
+
+```css
+html {
+  font-size: 1vw;
+}
+@media (max-width: 639px) {
+  html {
+    font-size: 4.266667vw;
+  }
+}
+```
+
+**Conversion formula:**
+- PC design (1920px): `rem = figma_px / 19.2`
+- If design is 1600px: `rem = figma_px / 16`
+- If design is 1440px: `rem = figma_px / 14.4`
+- General: `rem = figma_px / (design_width / 100)`
+- Mobile (375px base): same formula with mobile design width
+
+**ALL sizes must use rem** — font-size, padding, margin, gap, width, height, border-radius, letter-spacing. Never use px directly except for `1px` borders.
+
+## 2. Typography Utility Classes
+
+Generate reusable typography classes in `@layer components` inside the page CSS file.
+
+**Naming pattern:** `{platform}-{role}-{figmaPx}-{weight}`
+- Platform: `pc` (desktop ≥640px), `sp` (mobile <640px)
+- Role: `h1`, `h2`, `h3`, `body`, `caption`, `label`, `btn`, `link`
+- figmaPx: the original Figma pixel size (integer)
+- Weight: `r` (regular/400), `m` (medium/500), `s` (semibold/600), `b` (bold/700), `eb` (extrabold/800)
+
+**Example:**
+```css
+@layer components {
+  .pc-h2-54-s {
+    @apply text-[2.8125rem] font-semibold leading-[1.2] tracking-[-0.02813rem];
+  }
+  .pc-body-16-r {
+    @apply text-[0.8333rem] font-normal leading-[1.5] tracking-normal;
+  }
+  .sp-h2-28-s {
+    @apply text-[1.75rem] font-semibold leading-[1.2] tracking-[-0.0175rem];
+  }
+}
+```
+
+Always generate BOTH `pc-*` and `sp-*` variants for every text style found in the design.
+
+## 3. CSS Architecture — BEM
+
+Use BEM naming for component-level styles:
+
+**Block:** `.hero`, `.navbar`, `.product-card`
+**Element:** `.hero__title`, `.hero__cta`, `.product-card__image`
+**Modifier:** `.hero__cta--primary`, `.product-card--featured`
+
+Rules:
+- Define BEM classes in the page CSS file using `@apply` for Tailwind utilities
+- Component JSX uses BEM class names, NOT long Tailwind utility strings
+- Shared layout utilities (flex, grid, spacing) can remain as Tailwind classes in JSX
+- Visual styles (colors, typography, borders, shadows) MUST be BEM classes
+
+**Example:**
+```css
+/* src/features/kingtech/kingtech.css */
+@layer components {
+  .hero {
+    @apply relative w-full overflow-hidden;
+  }
+  .hero__content {
+    @apply relative z-10 flex flex-col;
+    padding: 7.7083rem 5.2083rem;
+  }
+  .hero__title {
+    @apply pc-h1-64-eb uppercase text-white;
+  }
+  .hero__description {
+    @apply pc-body-16-r text-white/80;
+    max-width: 33.125rem;
+  }
+}
+```
+
+```tsx
+// hero-section/index.tsx
+export const HeroSection: React.FC = () => (
+  <section className="hero">
+    <div className="hero__content">
+      <h2 className="hero__title">Title</h2>
+      <p className="hero__description">Description</p>
+    </div>
+  </section>
+);
+```
+
+## 4. HTML — Semantic & Flat
+
+- Use semantic elements: `<header>`, `<nav>`, `<main>`, `<section>`, `<article>`, `<footer>`, `<figure>`, `<figcaption>`
+- **Minimize nesting** — max 4-5 levels deep. If deeper, flatten or extract a component.
+- Clickable → `<button>` or `<a>`. Never `<div onClick>`.
+- Lists → `<ul>/<ol>` + `<li>`. Never `<div>` repeated.
+- Only ONE `<h1>` per page. Sections use `<h2>`, sub-sections `<h3>`.
+
+## 5. Naming Conventions
+
+### Images/Assets
+- Temporary/placeholder images prefix: `d-` (e.g., `d-hero-banner.webp`) — easy to find and replace later
+- Production images: descriptive kebab-case (e.g., `hero-banner.webp`, `product-iphone-15.webp`)
+- Icons: prefixed with `ic-` (e.g., `ic-arrow-right.svg`, `ic-close.svg`)
+- Logos: prefixed with `logo-` (e.g., `logo-kingtech.svg`)
+
+### Variables & Code
+- **No Vietnamese** in variable names, class names, file names
+- Variables: `camelCase` — `heroTitle`, `productPrice`, `isMenuOpen`
+- Components: `PascalCase` — `HeroSection`, `ProductCard`
+- Files/folders: `kebab-case` — `hero-section/`, `product-card/`
+- CSS classes: `kebab-case` BEM — `.hero__title`, `.product-card--featured`
+- Constants: `SCREAMING_SNAKE_CASE` — `MAX_PRODUCTS`, `API_BASE_URL`
+- Correct English grammar — `productList` not `listProduct`, `isLoading` not `loadingIs`
+
+## 6. SEO Requirements
+
+Every page MUST include:
+
+### Single H1
+- Only ONE `<h1>` per page — typically the main heading in the hero section
+- All other headings: `<h2>`, `<h3>`, etc. in proper hierarchy
+
+### Metadata (in route page.tsx)
+```tsx
+export const metadata: Metadata = {
+  title: 'Page Title | Brand',
+  description: 'Page description for search engines (120-160 chars)',
+  keywords: ['keyword1', 'keyword2'],
+  openGraph: {
+    title: 'Page Title',
+    description: 'Description',
+    images: [{ url: '/og-image.jpg', width: 1200, height: 630 }],
+  },
+  alternates: {
+    canonical: 'https://example.com/page',
+    languages: { 'vi': '/vi/page', 'en': '/en/page' },
+  },
+  robots: { index: true, follow: true },
+};
+```
+
+### JSON-LD Schema
+```tsx
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage', // or Organization, Product, Article, etc.
+  name: 'Page Title',
+  description: 'Description',
+  // ... type-specific fields
+};
+
+// In the route component:
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+/>
+```
+
+### hreflang (in layout or page)
+For multi-language sites, add alternate language links via metadata.alternates.languages.
+
+### robots.txt and sitemap
+- `public/robots.txt` — allow crawling, reference sitemap
+- `src/app/sitemap.ts` — dynamic sitemap generation
+- `src/app/not-found.tsx` — custom 404 page
+
+## 7. Asset Handling
+
+- **NEVER** leave Figma MCP asset URLs in code (they expire in 7 days)
+- Download images to `public/assets/images/[page-name]/`
+- Download SVGs to `src/assets/icons/`
+- Use WebP format for raster images when possible
+- Optimize images: set explicit `width`/`height` or use Next.js `<Image>` component
+- Lazy load below-fold images: `loading="lazy"`
+
+## 8. Smart Component Decomposition
+
+Target: **20-40 components** for a full landing page with 10-14 sections.
+
+**Create a sub-component ONLY when:**
+- Pattern repeats 3+ times (card grid, nav items)
+- Section exceeds 300 lines
+- Complex interactive state (carousel, accordion, dropdown)
+
+**Keep inline:**
+- Single text, button, icon, badge, simple container
+
+## 9. Figma MCP Usage
+
+Parse URL: `figma.com/design/{fileKey}/...?node-id={X-Y}` → `fileKey`, `nodeId: X:Y`
+
+Required calls (in order):
+1. `get_design_context({ fileKey, nodeId, framework: "react" })` — structure + code
+2. `get_variable_defs({ fileKey, nodeId })` — design tokens
+3. `get_code_connect_map({ fileKey, nodeId })` — existing component mappings
+4. `get_screenshot({ fileKey, nodeIds: [nodeId] })` — visual reference
+5. `get_image_fills({ fileKey, nodeId })` — downloadable assets
+
+## 10. Font Acquisition (must match Figma)
+
+Fonts must match the Figma design exactly. Try these sources in order:
+1. **Google Fonts** via `next/font/google` — check if the font name exists
+2. **@fontsource** npm package — `npm install @fontsource/{font-name}`
+3. **Font files** — search `public/assets/fonts/` or download `.woff2` files
+4. **Closest alternative** — if unavailable, find similar Google Font + add comment
+
+Include ALL weights used in the design. Include `vietnamese` subset for Vietnamese content.
+
+## 11. Quality Gates
+
+Before marking any implementation complete:
+1. ✅ `npm run dev` compiles without errors
+2. ✅ `npx eslint . --fix` passes
+3. ✅ `npx prettier --write .` formatted
+4. ✅ No Figma asset URLs in code
+5. ✅ No inline `style={{ }}` (use BEM classes)
+6. ✅ No Vietnamese in variable/class names
+7. ✅ Only one `<h1>` per page
+8. ✅ JSON-LD schema present
+9. ✅ Metadata complete
+
+## 12. Visual Verification Loop (self-improving)
+
+After build passes, verify section by section:
+1. Screenshot each section in browser (Claude in Chrome MCP)
+2. Screenshot same section in Figma (Figma MCP `get_screenshot`)
+3. Compare with Claude Vision — check typography, spacing, colors, layout, assets
+4. Fix ALL differences found
+5. Re-screenshot and compare again
+6. **Repeat until the section matches Figma** — do NOT stop after a fixed number of iterations
+7. Move to next section only when current one is verified
+8. Final full-page comparison after all sections pass
+
+Only negligible differences are acceptable (subpixel rendering, anti-aliasing).
