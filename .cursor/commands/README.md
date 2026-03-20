@@ -13,7 +13,7 @@ Analyze Figma design → produce implementation plan for review.
 ### Step 2: `/build-the-plan`
 Read PLAN.md → implement everything autonomously.
 - Downloads assets from Figma, saves locally
-- Sets up fonts, typography CSS, BEM classes
+- Sets up fonts, typography CSS utilities
 - Spawns parallel subagents for component generation
 - Assembles page with full SEO
 - Runs quality gates (build, ESLint, Prettier, visual validation)
@@ -37,7 +37,7 @@ Compare existing code against Figma → surgically fix discrepancies.
 
 See `.cursor/rules/figma-workflow.mdc` for:
 - vw/rem fluid typography
-- BEM CSS architecture
+- Tailwind CSS classes directly in JSX
 - Typography utility classes (`pc-h2-54-s`)
 - SEO requirements
 - Naming conventions

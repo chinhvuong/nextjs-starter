@@ -56,6 +56,8 @@
       /* Typography */
       --font-family-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       --font-family-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+      /* SVN-Gilroy — obtain .woff2 files from design team, load via next/font/local */
+      --font-family-gilroy: 'SVN-Gilroy', var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
   
   /* Spacing and Sizing */
   --border-radius: 0.5rem;

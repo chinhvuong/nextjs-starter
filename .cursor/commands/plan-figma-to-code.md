@@ -2,7 +2,7 @@
 
 ## Overview
 
-Analyze a Figma design and produce a detailed implementation plan for user review. The plan lists every section, its components, common/shared components, typography utilities, assets to download, fonts, and SEO setup. The user reviews and approves before building.
+Analyze a Figma design and produce a detailed implementation plan for user review. The plan lists components, sub-components, typography utilities, assets to download, fonts, and SEO setup (if applicable). The user reviews and approves before building.
 
 ## Usage
 
@@ -18,36 +18,60 @@ Extract `fileKey` and `nodeId` (convert `-` to `:` in node-id param).
 
 ### Step 2 — Fetch Figma Data
 
-Call the Figma MCP in order:
+Call the Figma MCP in parallel:
 
-1. `get_design_context({ fileKey, nodeId, framework: "react" })` — full structure
+1. `get_design_context({ fileKey, nodeId })` — full structure + screenshot
 2. `get_variable_defs({ fileKey, nodeId })` — design tokens
 3. `get_code_connect_map({ fileKey, nodeId })` — existing mappings
-4. `get_screenshot({ fileKey, nodeIds: [nodeId] })` — visual reference
-5. `get_image_fills({ fileKey, nodeId })` — image assets
+4. `get_metadata({ fileKey, nodeId })` — structure overview
 
-For large designs, also call `get_design_context` on each direct child (section) individually to get detailed data.
+**CRITICAL: Only fetch data for the provided nodeId. NEVER navigate to parent frames, sibling frames, or the page root. Plan ONLY what the user gives you.**
 
-### Step 3 — Analyze & Build Plan
+If the metadata shows many direct children (indicating a large frame), also call `get_design_context` on key children to get detailed data.
+
+### Step 3 — Determine Scope
+
+Examine the fetched node to determine its scope:
+
+**A. Full Page** — the node has many direct children at different Y positions, forming distinct visual sections (e.g., navbar, hero, footer). Typically height > 3000px with 5+ direct child frames.
+
+**B. Single Section** — the node is one self-contained visual block (e.g., a hero banner, a product list, a footer). Typically one logical area.
+
+**C. Single Component** — the node is a small reusable element (e.g., a button, a card, a nav item). Typically < 500px in both dimensions.
+
+This scope determines the plan format (see Step 5).
+
+### Step 4 — Analyze & Build Plan
 
 From the Figma data, determine:
 
-**A. Page info:**
-- Page name (kebab-case slug)
+**A. Frame info:**
+- Name (kebab-case slug)
 - Design frame dimensions (width × height)
 - rem divisor (`designWidth / 100`)
+- **Viewport target:** `desktop` or `mobile` — determined by design width:
+  - ≥ 1024px → `desktop` (common: 1440px, 1600px, 1920px)
+  - < 1024px → `mobile` (common: 375px, 390px, 414px)
+- **Layout strategy** (for full-page scope):
+  - Identify which sections are **full-bleed** vs **contained**
+  - Record the **content max-width**
 
-**B. Sections** (direct children of root, ordered top-to-bottom by Y):
-For each section:
-- Name (infer from layer name/content)
-- Figma nodeId
-- Figma URL for that section: `https://www.figma.com/design/{fileKey}?node-id={nodeId-with-hyphens}`
-- Complexity: simple / medium / complex
-- Which heading level it uses (h1 for exactly ONE section, h2 for others)
-- Sub-components needed (only for repeated patterns 3+, complex interactive elements, or >300 lines)
+**B. Components breakdown:**
 
-**C. Common components** (reused across 2+ sections):
-- Buttons, cards, badges, nav items that appear in multiple sections
+For **Full Page** scope:
+- List sections (direct children of root, ordered top-to-bottom by Y)
+- For each section: name, nodeId, Figma URL, layout type, complexity, heading level, sub-components
+
+For **Single Section** scope:
+- List sub-components within the section
+- For each: name, nodeId, what it does, whether it's repeated
+
+For **Single Component** scope:
+- List props/variants visible in the design
+- Note interactive states if visible
+
+**C. Common components** (reused across 2+ places):
+- Buttons, cards, badges, etc. that appear multiple times
 - Existing shared components from `src/shared/components/` to reuse
 
 **D. Typography catalog:**
@@ -71,55 +95,57 @@ For each font family found in the design:
    - Note the exact font to acquire from the design team
 5. Record: family name, source (google/fontsource/npm/custom), weights needed, installation method
 
-**G. SEO plan:**
+**G. SEO plan (Full Page scope only):**
 - JSON-LD schema type (Organization, Product, WebPage, etc.)
 - Suggested metadata (title, description, keywords)
 - hreflang languages
 
-### Step 4 — Save Plan to File
+### Step 5 — Save Plan to File
 
 Write the plan as a structured markdown file at:
-`src/features/{pageName}/PLAN.md`
+- Full Page: `src/features/{pageName}/PLAN.md`
+- Single Section: `src/features/{pageName}/PLAN.md` (create feature dir if needed)
+- Single Component: `src/features/{pageName}/PLAN.md` or relevant feature dir
 
-### Step 5 — Present Plan to User
+### Step 6 — Present Plan to User
 
-Print the plan in a clear, reviewable format:
+Use the appropriate format based on scope:
+
+---
+
+#### Format A: Full Page
 
 ```markdown
 ## Plan: {Page Name}
 
 **Figma:** {url}
-**Design:** {width}×{height}px | rem divisor: {divisor}
+**Scope:** Full Page
+**Design:** {width}×{height}px | rem divisor: {divisor} | Viewport: {desktop/mobile}
+**Layout:** Content max-width: {contentWidth}rem | Full-bleed sections: {list}
 **Screenshot:** [embedded]
 
 ---
 
 ### Sections ({count})
 
-| # | Section | Node ID | Complexity | Heading | Components |
-|---|---------|---------|------------|---------|------------|
-| 1 | Navbar | 18:20 | simple | — | — |
-| 2 | Hero | 18:35 | medium | **h1** | HeroSlideIndicator |
-| 3 | Product Categories | 18:50 | medium | h2 | CategoryCard (×8) |
-| 4 | Flash Sale | 18:70 | complex | h2 | CountdownTimer, ProductCard (×4) |
-| ... | ... | ... | ... | ... | ... |
-| 14 | Footer | 18:900 | medium | — | FooterColumn (×4) |
+| # | Section | Node ID | Layout | Complexity | Heading | Components |
+|---|---------|---------|--------|------------|---------|------------|
+| 1 | Navbar | 18:20 | full-bleed | simple | — | — |
+| 2 | Hero | 18:35 | full-bleed | medium | **h1** | HeroSlideIndicator |
+| ... | ... | ... | ... | ... | ... | ... |
 
 ### Common Components (shared across sections)
 
 | Component | Used in | Source |
 |-----------|---------|--------|
-| Button | Hero, FlashSale, CTA | `@/shared/components/button` (existing) |
-| ProductCard | FlashSale, Products | new — `src/features/{pageName}/components/product-card/` |
-| SectionHeading | 6 sections | new — `src/features/{pageName}/components/section-heading/` |
+| Button | Hero, CTA | `@/shared/components/button` (existing) |
+| ProductCard | FlashSale, Products | new — `components/product-card/` |
 
 ### Typography ({count} unique styles)
 
 | Class | Figma | rem | Weight | Line Height | Used in |
 |-------|-------|-----|--------|-------------|---------|
-| pc-h1-64-eb | 64px | 3.3333rem | 800 | 1.2 | Hero |
-| pc-h2-40-b | 40px | 2.0833rem | 700 | 1.2 | 6 sections |
-| pc-body-16-r | 16px | 0.8333rem | 400 | 1.5 | everywhere |
+| pc-h1-40-xb | 40px | 2.5rem | 800 | 1.2 | Hero |
 | ... | ... | ... | ... | ... | ... |
 
 ### Assets to Download ({count})
@@ -127,53 +153,128 @@ Print the plan in a clear, reviewable format:
 | Type | Filename | Section | Figma Node |
 |------|----------|---------|------------|
 | image | d-hero-banner.webp | Hero | 341:100 |
-| image | d-product-1.webp | Products | 341:200 |
-| icon | ic-arrow-right.svg | Hero, Products | 341:300 |
-| logo | logo-kingtech.svg | Navbar, Footer | 341:400 |
 | ... | ... | ... | ... |
 
-### Fonts (must match Figma)
+### Fonts
 
 | Family | Source | Weights | Install Method |
 |--------|--------|---------|----------------|
-| SVN-Gilroy | custom | 400, 600, 800 | npm: `@fontsource/gilroy` or font files from design team |
-| Inter | google | 400, 500, 600, 700 | Already in project ✅ |
-
-**Font acquisition priority:** Google Fonts → @fontsource npm → font files from team → closest alternative
+| ... | ... | ... | ... |
 
 ### SEO
 
 - **JSON-LD:** Organization
-- **Title:** KingTech - Máy Massage Mắt Cao Cấp
-- **Description:** Thương hiệu máy massage mắt hàng đầu...
-- **Languages:** vi, en
+- **Title:** ...
+- **Description:** ...
+
+### Files to Create
+
+...
+
+**Total: ~{N} components**
+
+---
+
+Ready to build? Run: `/figma-build`
+```
+
+---
+
+#### Format B: Single Section
+
+```markdown
+## Plan: {Section Name}
+
+**Figma:** {url}
+**Scope:** Single Section
+**Design:** {width}×{height}px | rem divisor: {divisor} | Viewport: {desktop/mobile}
+**Layout type:** {full-bleed / contained}
+**Screenshot:** [embedded]
+
+---
+
+### Component Breakdown
+
+| # | Component | Node ID | Description | Repeated |
+|---|-----------|---------|-------------|----------|
+| 1 | HeroBanner (root) | 21:66 | Main section wrapper | — |
+| 2 | CarouselArrow | 2703:18737 | Left/right navigation arrows | ×2 |
+| 3 | SlideIndicator | 341:3812 | Dot indicators for slides | — |
+| ... | ... | ... | ... | ... |
+
+### Typography
+
+| Class | Figma | rem | Weight | Line Height | Element |
+|-------|-------|-----|--------|-------------|---------|
+| pc-h1-40-xb | 40px | 2.5rem | 800 | 1.5 | Main heading |
+| ... | ... | ... | ... | ... | ... |
+
+### Assets to Download
+
+| Type | Filename | Figma Node |
+|------|----------|------------|
+| image | d-hero-banner.webp | 341:3648 |
+| ... | ... | ... |
+
+### Fonts
+
+| Family | Source | Weights | Install Method |
+|--------|--------|---------|----------------|
+| ... | ... | ... | ... |
 
 ### Files to Create
 
 ```
-src/app/{pageName}/page.tsx                          ← route + metadata + JSON-LD
-src/features/{pageName}/index.tsx                    ← barrel
-src/features/{pageName}/{pageName}-page.tsx          ← page assembly
-src/features/{pageName}/{pageName}.css               ← BEM + typography
-src/features/{pageName}/PLAN.md                      ← this plan
 src/features/{pageName}/components/
-  navbar/index.tsx
-  hero-section/index.tsx
-  hero-slide-indicator/index.tsx
-  product-categories/index.tsx
-  category-card/index.tsx
-  ...
-  footer/index.tsx
-  footer-column/index.tsx
-public/assets/images/{pageName}/                     ← downloaded images
-src/assets/icons/                                    ← downloaded SVGs
+  {section-name}/index.tsx                ← main section component
+  {sub-component}/index.tsx               ← if complex enough to extract
 ```
 
 **Total: ~{N} components**
 
 ---
 
-Ready to build? Run: `/build-the-plan`
+Ready to build? Run: `/figma-build`
+```
+
+---
+
+#### Format C: Single Component
+
+```markdown
+## Plan: {Component Name}
+
+**Figma:** {url}
+**Scope:** Single Component
+**Design:** {width}×{height}px | rem divisor: {divisor}
+**Screenshot:** [embedded]
+
+---
+
+### Props / Variants
+
+| Prop | Values | Default |
+|------|--------|---------|
+| variant | default, hover, active | default |
+| ... | ... | ... |
+
+### Typography
+
+| Class | Figma | rem | Weight |
+|-------|-------|-----|--------|
+| ... | ... | ... | ... |
+
+### Assets
+
+| Type | Filename | Figma Node |
+|------|----------|------------|
+| ... | ... | ... |
+
+### File
+
+```
+src/features/{pageName}/components/{component-name}/index.tsx
+```
 ```
 
 ---
@@ -181,8 +282,9 @@ Ready to build? Run: `/build-the-plan`
 ## Rules
 
 - **Do NOT generate any code** — this command only produces the plan.
-- **Save the plan** to `src/features/{pageName}/PLAN.md` so `/build-the-plan` can read it.
-- Use actual Figma node IDs — never invent.
-- Follow Smart Decomposition: 20-40 components for a full landing page.
-- Include Figma URL per section so each can be fetched individually during build.
-- The plan is the contract — `/build-the-plan` follows it exactly.
+- **Save the plan** to the appropriate `PLAN.md` location so `/figma-build` can read it.
+- **NEVER navigate to parent frames.** Plan ONLY the exact node the user provides. If they send a single section, plan that section — do NOT find and plan the entire page.
+- Use actual Figma node IDs from the fetched data — never invent.
+- Follow Smart Decomposition: only extract sub-components for repeated patterns (3+), complex interactive elements, or code > 300 lines.
+- Include Figma URL per component so each can be fetched individually during build.
+- The plan is the contract — `/figma-build` follows it exactly.

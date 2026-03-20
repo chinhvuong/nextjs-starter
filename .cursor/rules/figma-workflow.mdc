@@ -56,48 +56,24 @@ Generate reusable typography classes in `@layer components` inside the page CSS 
 
 Always generate BOTH `pc-*` and `sp-*` variants for every text style found in the design.
 
-## 3. CSS Architecture — BEM
+## 3. CSS Architecture — Tailwind Classes in JSX
 
-Use BEM naming for component-level styles:
-
-**Block:** `.hero`, `.navbar`, `.product-card`
-**Element:** `.hero__title`, `.hero__cta`, `.product-card__image`
-**Modifier:** `.hero__cta--primary`, `.product-card--featured`
+Apply Tailwind utility classes directly in JSX. No separate CSS file for component styles (only typography utility classes remain in the page CSS file).
 
 Rules:
-- Define BEM classes in the page CSS file using `@apply` for Tailwind utilities
-- Component JSX uses BEM class names, NOT long Tailwind utility strings
-- Shared layout utilities (flex, grid, spacing) can remain as Tailwind classes in JSX
-- Visual styles (colors, typography, borders, shadows) MUST be BEM classes
+- Use Tailwind utility classes (including arbitrary values `[...]`) directly in JSX `className`
+- Use `cn()` from `@/shared/utils/cn` for conditional/merged classes
+- Typography utility classes (`pc-h1-64-eb`, `sp-body-16-r`, etc.) are defined in the page CSS file and used alongside Tailwind classes in JSX
+- No inline `style={{ }}` — use Tailwind arbitrary values instead
 
 **Example:**
-```css
-/* src/features/kingtech/kingtech.css */
-@layer components {
-  .hero {
-    @apply relative w-full overflow-hidden;
-  }
-  .hero__content {
-    @apply relative z-10 flex flex-col;
-    padding: 7.7083rem 5.2083rem;
-  }
-  .hero__title {
-    @apply pc-h1-64-eb uppercase text-white;
-  }
-  .hero__description {
-    @apply pc-body-16-r text-white/80;
-    max-width: 33.125rem;
-  }
-}
-```
-
 ```tsx
 // hero-section/index.tsx
 export const HeroSection: React.FC = () => (
-  <section className="hero">
-    <div className="hero__content">
-      <h2 className="hero__title">Title</h2>
-      <p className="hero__description">Description</p>
+  <section className="relative w-full overflow-hidden">
+    <div className="relative z-10 flex flex-col pt-[7.7083rem] px-[5.2083rem] pb-[4.1667rem]">
+      <h2 className="pc-h1-64-eb uppercase text-white">Title</h2>
+      <p className="pc-body-16-r text-white/80 max-w-[33.125rem]">Description</p>
     </div>
   </section>
 );
@@ -124,7 +100,7 @@ export const HeroSection: React.FC = () => (
 - Variables: `camelCase` — `heroTitle`, `productPrice`, `isMenuOpen`
 - Components: `PascalCase` — `HeroSection`, `ProductCard`
 - Files/folders: `kebab-case` — `hero-section/`, `product-card/`
-- CSS classes: `kebab-case` BEM — `.hero__title`, `.product-card--featured`
+- CSS classes: Tailwind utilities directly in JSX — no custom CSS class names for components
 - Constants: `SCREAMING_SNAKE_CASE` — `MAX_PRODUCTS`, `API_BASE_URL`
 - Correct English grammar — `productList` not `listProduct`, `isLoading` not `loadingIs`
 
@@ -229,7 +205,7 @@ Before marking any implementation complete:
 2. ✅ `npx eslint . --fix` passes
 3. ✅ `npx prettier --write .` formatted
 4. ✅ No Figma asset URLs in code
-5. ✅ No inline `style={{ }}` (use BEM classes)
+5. ✅ No inline `style={{ }}` (use Tailwind classes)
 6. ✅ No Vietnamese in variable/class names
 7. ✅ Only one `<h1>` per page
 8. ✅ JSON-LD schema present

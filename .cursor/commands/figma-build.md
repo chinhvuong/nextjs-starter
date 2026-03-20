@@ -23,7 +23,7 @@ Extract:
 - Page name, design dimensions, rem divisor
 - Section list with nodeIds, components, heading assignments
 - Common components list
-- Typography catalog
+- Typography reference (Tailwind classes per text style)
 - Asset list with filenames and Figma node IDs
 - Font requirements
 - SEO config (JSON-LD type, metadata, languages)
@@ -36,21 +36,112 @@ If PLAN.md doesn't exist, tell the user to run `/plan-figma-to-code` first.
 
 #### 1a. Download ALL assets from Figma
 
-For each asset in the plan:
+The Figma MCP does NOT have a `get_figma_images` tool. Assets are extracted from `get_design_context` responses.
 
-**Images:**
-- Use Figma MCP `get_figma_images({ fileKey, nodeId })` to get export URLs
-- Download each image using `WebFetch` or `curl`
-- Save to `public/assets/images/{pageName}/{filename}`
-- Use the exact filenames from the plan (`d-` prefix for placeholders)
+**How to get asset URLs:**
+1. Call `get_design_context({ fileKey, nodeId })` for each section
+2. The response contains asset URLs as constants at the top of the generated code:
+   ```
+   const imgBanner = "https://www.figma.com/api/mcp/asset/UUID";
+   const imgLogo = "https://www.figma.com/api/mcp/asset/UUID";
+   ```
+3. Extract ALL `https://www.figma.com/api/mcp/asset/...` URLs from the response
+4. Map each URL to its planned local filename using the `data-name` attributes in the code
 
-**SVGs/Icons:**
-- Use Figma MCP `get_figma_images({ fileKey, nodeId })` with SVG format
-- Save to `src/assets/icons/{filename}`
+**Downloading images:**
+```bash
+# Download to a temp file first (no extension), then detect and rename
+curl -sL -o "/tmp/figma-asset-tmp" "FIGMA_ASSET_URL"
+```
+
+**IMPORTANT: Asset URLs expire after 7 days.** Download them immediately.
+
+**CRITICAL: Detect the actual file format and use the correct extension.**
+Figma asset URLs return images in their **native format** — this can be PNG, JPEG, SVG, WebP, GIF, or anything else. The format is unpredictable. You MUST detect it after download and use the matching extension.
+
+**Use this helper function for ALL asset downloads:**
+```bash
+# Download a Figma asset with auto-detected extension
+# Usage: download_figma_asset "FIGMA_URL" "path/without/extension"
+download_figma_asset() {
+  local url="$1"
+  local base="$2"  # NO extension — e.g. public/assets/images/page/d-hero
+
+  curl -sL -o /tmp/figma-dl-tmp "$url"
+
+  # Auto-detect the real format from file content
+  local mime
+  mime=$(file -b --mime-type /tmp/figma-dl-tmp)
+  local ext
+  case "$mime" in
+    image/png)                  ext="png" ;;
+    image/jpeg)                 ext="jpg" ;;
+    image/svg+xml)              ext="svg" ;;
+    image/webp)                 ext="webp" ;;
+    image/gif)                  ext="gif" ;;
+    image/avif)                 ext="avif" ;;
+    image/bmp)                  ext="bmp" ;;
+    image/tiff)                 ext="tiff" ;;
+    application/pdf)            ext="pdf" ;;
+    text/xml|application/xml)   ext="svg" ;;  # SVG sometimes detected as XML
+    text/html)
+      echo "  SKIP: ${base} — received HTML (likely error page)"
+      rm -f /tmp/figma-dl-tmp
+      return 1
+      ;;
+    *)
+      echo "  WARN: ${base} — unknown type '${mime}', defaulting to .png"
+      ext="png"
+      ;;
+  esac
+
+  mv /tmp/figma-dl-tmp "${base}.${ext}"
+  echo "  OK: ${base}.${ext}"
+}
+```
+
+**Usage — download each planned asset (NO extension in the path):**
+```bash
+download_figma_asset "FIGMA_URL_1" "public/assets/images/{pageName}/d-hero-banner"
+download_figma_asset "FIGMA_URL_2" "public/assets/images/{pageName}/d-product-1"
+download_figma_asset "FIGMA_URL_3" "src/assets/icons/ic-arrow-right"
+```
+
+The function will produce files like `d-hero-banner.png`, `d-product-1.jpg`, `ic-arrow-right.svg` — whatever the actual format is.
+
+**After downloading, record the real filenames** so components reference the correct extension. When passing asset paths to subagents, use the actual filenames (with detected extensions), not hardcoded ones.
+
+**SVGs that are icons/logos** (small, vector) should be downloaded to `src/assets/icons/` instead of `public/assets/images/`.
+
+**Batch validation after all downloads:**
+```bash
+# Fix any remaining mismatches
+for f in public/assets/images/{pageName}/*; do
+  mime=$(file -b --mime-type "$f")
+  actual_ext="${f##*.}"
+  expected_ext=$(case "$mime" in
+    image/png) echo png;; image/jpeg) echo jpg;; image/svg+xml) echo svg;;
+    image/webp) echo webp;; image/gif) echo gif;; *) echo "$actual_ext";;
+  esac)
+  if [ "$actual_ext" != "$expected_ext" ]; then
+    mv "$f" "${f%.*}.${expected_ext}"
+    echo "Renamed: $(basename $f) → $(basename ${f%.*}).${expected_ext}"
+  fi
+done
+```
+
+**For SVGs/Icons:**
+- SVG assets also come from `get_design_context` — look for icon-sized elements
+- Download and save to `src/assets/icons/{filename}.svg`
+- Validate: `file` should show "SVG Scalable Vector Graphics"
 - Add/update exports in `src/assets/icons/index.ts`
 
-**Logos:**
+**For Logos:**
 - Same as icons, save to `src/assets/icons/logo-{name}.svg`
+
+**Fallback for missing assets:**
+- If an asset URL fails, use `get_screenshot({ fileKey, nodeIds: [nodeId] })` to capture the node as a PNG screenshot
+- Save the screenshot as the asset — it won't be perfect but is better than a broken image
 
 #### 1b. Acquire & Register Fonts (must match Figma exactly)
 
@@ -91,41 +182,11 @@ npm install @fontsource/{font-name-lowercase}
 - Verify the font loads by checking the dev server
 - Include ALL weights used in the design (400, 500, 600, 700, 800 etc.)
 
-#### 1c. Create page CSS file
-
-Create `src/features/{pageName}/{pageName}.css` with:
-
-```css
-/* Import base styles */
-
-@layer components {
-  /* === Typography Utilities === */
-  /* Auto-generated from Figma design — DO NOT edit manually */
-
-  /* PC (Desktop) */
-  .pc-h1-64-eb {
-    @apply text-[3.3333rem] font-extrabold leading-[1.2] tracking-[-0.03333rem];
-  }
-  /* ... all pc-* classes from the plan ... */
-
-  /* SP (Mobile) */
-  .sp-h1-32-eb {
-    @apply text-[2rem] font-extrabold leading-[1.2] tracking-[-0.02rem];
-  }
-  /* ... all sp-* classes from the plan ... */
-
-  /* === BEM Classes === */
-  /* Will be added by component generators below */
-}
-```
-
-Generate ALL typography utility classes from the plan's typography catalog.
-
-#### 1d. Create scaffold files
+#### 1c. Create scaffold files
 
 **Route:** `src/app/{pageName}/page.tsx` — with full metadata, JSON-LD, hreflang from SEO plan
 **Barrel:** `src/features/{pageName}/index.tsx`
-**Page component:** `src/features/{pageName}/{pageName}-page.tsx` — imports all sections in layoutOrder + imports the CSS file
+**Page component:** `src/features/{pageName}/{pageName}-page.tsx` — imports all sections in layoutOrder
 
 ---
 
@@ -136,13 +197,13 @@ Spawn one subagent per common component from the plan. Each subagent:
 1. Gets the Figma design data for the component's node (`get_design_context`)
 2. Gets a screenshot for reference (`get_screenshot`)
 3. Generates the component following ALL rules from `figma-workflow.mdc`:
-   - BEM CSS classes (append to page CSS file)
+   - Tailwind classes directly in JSX
    - All dimensions in rem
-   - Typography utility classes from Step 1c
+   - Typography: apply Tailwind classes directly in JSX (text-[size] font-[weight] leading-[lh] etc.)
    - Local asset paths from Step 1a
    - Semantic HTML, max 4-5 nesting levels
    - Named export, no inline styles, no Vietnamese names
-4. Returns: component file path, BEM classes added, any warnings
+4. Returns: component file path, Tailwind classes used, any warnings
 
 **Run ALL common component subagents in parallel.**
 Wait for all to complete before Step 3.
@@ -157,22 +218,22 @@ Spawn one subagent per section from the plan. Each subagent:
 2. Gets a screenshot for visual reference (`get_screenshot`)
 3. Gets image fills if the section has images (`get_image_fills`)
 4. Generates the section component + any section-specific sub-components:
-   - BEM CSS classes (append to page CSS file)
+   - Tailwind classes directly in JSX
    - All dimensions in rem (using remDivisor from plan)
-   - Use typography utility classes from Step 1c
+   - Typography: apply Tailwind classes directly in JSX per the plan's typography reference
    - Use local asset paths from Step 1a
    - Import common components from Step 2
    - `<h1>` ONLY if this section is marked as the H1 section in the plan
    - Semantic HTML, max 4-5 nesting levels
    - Each sub-component in its own directory: `{sub-component}/index.tsx`
-5. Returns: file paths created, BEM classes added, warnings, TODOs
+5. Returns: file paths created, Tailwind classes used, warnings, TODOs
 
 **Run ALL section subagents in parallel.**
 Wait for all to complete before Step 4.
 
 Each section subagent MUST read `figma-workflow.mdc` and follow:
 - vw/rem fluid sizing
-- BEM CSS architecture
+- Tailwind CSS classes directly in JSX
 - Semantic & flat HTML
 - Naming conventions
 - Asset handling rules
@@ -209,8 +270,8 @@ After all components are generated:
 ### Step 5 — Build & Lint (fix until clean)
 
 ```bash
-# 1. Build check — must compile
-npm run dev
+# 1. Build check — must compile (use next build, not dev)
+npx next build --no-lint
 # If errors → fix imports, types, missing files → retry until clean
 
 # 2. ESLint
@@ -225,22 +286,42 @@ Do NOT proceed to Step 6 until build is clean.
 
 ---
 
-### Step 6 — Visual Verification & Self-Improvement Loop
+### Step 6 — Visual Verification & Self-Improvement Loop (Playwright)
 
-This is the critical step. Compare the implementation against Figma **section by section** and keep fixing until it matches.
+This is the critical step. Use **Playwright** to screenshot the running page, compare against Figma screenshots, and fix differences iteratively.
 
-#### 6a. Setup
-1. Ensure dev server is running (`npm run dev`)
-2. Open browser via Claude in Chrome MCP:
-   ```
-   tabs_context_mcp({ createIfEmpty: true }) → tabId
-   navigate({ url: "http://localhost:3000/{pageName}", tabId })
-   computer({ action: "wait", duration: 3, tabId })
-   ```
-3. Fetch the full-page Figma screenshot:
-   ```
-   get_screenshot({ fileKey, nodeIds: [rootNodeId] })
-   ```
+#### 6a. Setup — Start Dev Server + Prepare Screenshot Tool
+
+```bash
+# Kill stale dev servers (IMPORTANT: old servers may cache old code)
+lsof -ti:3000 | xargs kill -9 2>/dev/null
+
+# Start fresh dev server
+npm run dev &
+sleep 5
+
+# Verify server is ready
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/{pageName}
+# Must return 200
+```
+
+**Screenshot utility** — use `scripts/screenshot.mjs` (or create it):
+```js
+// scripts/screenshot.mjs
+import { chromium } from 'playwright';
+const args = process.argv.slice(2);
+const url = args.find(a => !a.startsWith('--')) || 'http://localhost:3000';
+const output = args.filter(a => !a.startsWith('--'))[1] || '/tmp/screenshot.png';
+const width = parseInt(args.find(a => a.startsWith('--width='))?.split('=')[1] || '1600');
+const fullPage = args.includes('--full-page');
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width, height: 900 } });
+await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: output, fullPage });
+console.log(`Screenshot saved: ${output}`);
+await browser.close();
+```
 
 #### 6b. Section-by-Section Comparison Loop
 
@@ -251,51 +332,63 @@ For EACH section in layoutOrder:
    get_screenshot({ fileKey, nodeIds: [sectionNodeId] })
    ```
 
-2. **Get browser screenshot** of this section:
+2. **Take browser screenshot** with Playwright:
+   ```bash
+   node scripts/screenshot.mjs "http://localhost:3000/{pageName}" "/tmp/{section}.png" --width={designWidth}
    ```
-   read_page({ tabId })                    → find section element ref
-   computer({ action: "scroll_to", ref, tabId })
-   computer({ action: "screenshot", tabId })
-   computer({ action: "zoom", region: [sectionBounds], tabId })  → focused screenshot
-   ```
+   Then read the screenshot file with the `Read` tool to view it.
 
-3. **Compare with Claude Vision** — analyze both images and list ALL differences:
-   - **Typography:** font family (does it match Figma?), size, weight, color, line-height, letter-spacing
+3. **Compare both images** — analyze side by side and list ALL differences:
+   - **Aspect ratio:** does the section maintain Figma's proportions? (CRITICAL)
+   - **Text wrapping:** do headings break on the same lines as Figma?
+   - **Typography:** font family, size, weight, color, line-height
    - **Spacing:** padding, margin, gap between elements
    - **Colors:** background, text, borders, gradients, opacity
    - **Layout:** element positions, alignment, flex direction, dimensions
    - **Images/Icons:** present, correct size, correct position, not broken
-   - **Missing elements:** anything in Figma but not in the implementation
-   - **Extra elements:** anything in implementation but not in Figma
+   - **Interactive elements:** carousel arrows visible, indicators present
+   - **Missing/extra elements**
 
-4. **If differences found → FIX them:**
-   - Edit the component TSX and/or BEM CSS classes
-   - For font mismatches: verify the font loaded correctly, check font-weight mapping
-   - For spacing/sizing: recalculate rem values from Figma px
-   - For missing elements: add them from the Figma design data
-   - For color differences: use exact hex values from Figma
+4. **Common issues and fixes:**
+   - **Aspect ratio broken (section too tall/short):** Use `aspect-[W/H]` on the section container
+   - **Text wrapping differently:** Widen text container (`%`), add `whitespace-nowrap` on heading spans if lines are hardcoded
+   - **Elements mispositioned:** Convert `rem` positions to `%` of parent
+   - **Carousel not functional:** Add `useState` + `onClick` + `transition-transform`
+   - **Dev server showing stale code:** Kill and restart (`lsof -ti:3000 | xargs kill -9`)
+   - **Section computed height wrong:** Debug with Playwright `page.evaluate()` to check computed styles
 
-5. **Re-screenshot and compare again:**
-   - After fixes, take a new browser screenshot of the same section
-   - Compare again with Claude Vision
-   - If still differences → fix again
-   - **Repeat until this section matches** or differences are truly negligible (subpixel rendering, anti-aliasing)
+5. **Re-screenshot after fixes:**
+   ```bash
+   # Wait for hot reload
+   sleep 2
+   node scripts/screenshot.mjs "http://localhost:3000/{pageName}" "/tmp/{section}-v2.png" --width={designWidth}
+   ```
+   Read and compare again. **Repeat until this section matches.**
 
-6. **Move to next section** only when current section is verified
+6. **Test at multiple viewports** to confirm proportional sizing:
+   ```bash
+   node scripts/screenshot.mjs "http://localhost:3000/{pageName}" "/tmp/{section}-1920.png" --width=1920
+   node scripts/screenshot.mjs "http://localhost:3000/{pageName}" "/tmp/{section}-1280.png" --width=1280
+   ```
+
+7. **Move to next section** only when current section is verified
 
 #### 6c. Full-Page Final Check
 
 After all sections pass individually:
 
-1. Take a full-page browser screenshot
-2. Compare against full-page Figma screenshot
-3. Check overall:
+1. Take full-page screenshots at design width and other viewports:
+   ```bash
+   node scripts/screenshot.mjs "http://localhost:3000/{pageName}" "/tmp/full-page.png" --width={designWidth} --full-page
+   ```
+2. Get full-page Figma screenshot for comparison
+3. Check:
    - Section spacing/gaps between sections
    - Overall page flow and visual rhythm
    - No missing sections
    - Colors consistent across sections
-4. Fix any remaining issues
-5. Re-check until satisfied
+   - All interactive elements present (carousel, buttons)
+4. Fix any remaining issues and re-screenshot
 
 #### 6d. Verification Checklist (must ALL pass)
 
@@ -306,7 +399,7 @@ After all sections pass individually:
 - [ ] All images/icons visible and correctly positioned
 - [ ] No broken images or missing assets
 - [ ] No Figma asset URLs remaining in code
-- [ ] No inline `style={{ }}` props
+- [ ] No inline `style={{ }}` props (except dynamic carousel transform)
 - [ ] No Vietnamese in variable/class names
 - [ ] Only one `<h1>` per page
 - [ ] JSON-LD schema present
@@ -314,6 +407,7 @@ After all sections pass individually:
 - [ ] `npm run dev` still compiles after all fixes
 - [ ] ESLint still passes
 - [ ] Prettier still formatted
+- [ ] No custom CSS typography classes (no pc-*, sp-* — all Tailwind in JSX)
 
 ---
 
@@ -326,7 +420,6 @@ After all sections pass individually:
   src/app/{pageName}/page.tsx
   src/features/{pageName}/index.tsx
   src/features/{pageName}/{pageName}-page.tsx
-  src/features/{pageName}/{pageName}.css
   src/features/{pageName}/components/
     navbar/index.tsx
     hero-section/index.tsx
@@ -366,24 +459,47 @@ When spawning subagents for component generation, pass this context:
 ```
 You are generating a React component from a Figma design.
 
-CRITICAL RULES (from figma-workflow.mdc):
-1. ALL dimensions in rem: rem = figma_px / {remDivisor}
-2. BEM CSS classes in the page CSS file — JSX uses class names, NOT Tailwind utility strings
-3. Typography: use pre-generated utility classes (pc-h2-54-s, etc.)
-4. Assets: use LOCAL paths only (/assets/images/... or @/assets/icons/...)
-5. Semantic HTML: <section>, <article>, <nav>, <header>, <footer>, <ul>+<li>, <button>, <a>
-6. Max 4-5 nesting levels
-7. No inline style={{ }}
-8. No Vietnamese in names
-9. Named export only
-10. H1 only if assigned to this section
+CRITICAL RULES:
+1. PROPORTIONAL SIZING — use the right unit for each property:
+   - Section container: `aspect-[W/H]` to lock Figma proportions (e.g., `aspect-[1600/627]`)
+   - Positions (left, top): `%` of parent (figma_px / designDimension × 100)
+   - Font sizes: ALWAYS `rem` (figma_px / remDivisor) — never vw for fonts
+   - Spacing (gap, padding): `rem` by default
+   - Element widths: `%` of parent
+   - Small fixed elements (dots, borders, blur): `px`
+   - Button/icon sizes: `rem` or Tailwind classes (w-12 = 48px)
+   - This ensures the design scales while keeping text accessible
+2. Tailwind CSS classes directly in JSX — use arbitrary values for exact Figma dimensions
+3. Typography: apply Tailwind classes directly in JSX — text-[2.5vw] font-[weight] leading-[lh] tracking-[ls] font-[family-name:var(--font-family-name)]
+   - Do NOT use custom CSS utility classes (no pc-*, sp-* classes)
+   - Do NOT create or import any page CSS file for typography
+4. Assets: DOWNLOAD all images from Figma asset URLs to local paths, then reference LOCAL paths only
+   - Images → public/assets/images/{pageName}/d-{name}.png
+   - Icons → src/assets/icons/ic-{name}.svg
+   - Use `curl -sL -o <path> <figma-url>` to download
+   - Validate with `file <path>` — must be PNG/JPEG/SVG, not HTML
+   - NEVER use figma.com URLs in the final component code
+5. CAROUSEL/SLIDER: If design has carousel indicators (dots/arrows):
+   - Implement functional slider with useState + translateX transition
+   - Count dots in Figma = TOTAL_SLIDES
+   - Arrows must navigate, dots must be clickable
+   - Auto-advance with setInterval (5s)
+   - `style={{ transform }}` is the ONE allowed inline style (dynamic value)
+6. Semantic HTML: <section>, <article>, <nav>, <header>, <footer>, <ul>+<li>, <button>, <a>
+7. Max 4-5 nesting levels
+8. No inline style={{ }} except for dynamic carousel transform
+9. No Vietnamese in names
+10. Named export only, React.FC type annotation
+11. H1 only if assigned to this section
+12. Add 'use client' directive at the TOP of the file (before imports) if the component uses:
+    - React hooks (useState, useEffect, useRef, useCallback)
+    - Event handlers (onClick, onChange, onSubmit, etc.)
+    - Browser APIs (window, document)
 
-Page CSS file: {pageCssPath}
-Typography classes available: {list}
 Asset paths: {mapping}
-Design width: {designWidth}px, rem divisor: {remDivisor}
+Design: {designWidth}×{designHeight}px, rem divisor: {remDivisor}
 
-Append your BEM classes to the page CSS file in @layer components.
+Apply all typography as Tailwind classes directly in JSX. No separate CSS file needed.
 Create the component at: {outputPath}
 ```
 
@@ -393,7 +509,7 @@ Create the component at: {outputPath}
 
 1. **Read PLAN.md first** — the plan is the contract, follow it exactly.
 2. **Download ALL assets before generating code** — no Figma URLs in components.
-3. **Typography utilities first** — generate CSS file before spawning component subagents.
+3. **No separate CSS for typography** — apply Tailwind classes directly in JSX, no page CSS file.
 4. **Common components before sections** — sections may depend on common components.
 5. **Maximum parallelism** — all common components in parallel, then all sections in parallel.
 6. **Every subagent follows figma-workflow.mdc** — pass the rules in the subagent prompt.

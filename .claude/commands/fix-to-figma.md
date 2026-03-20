@@ -55,7 +55,7 @@ Record: reference JSX, screenshot image, root dimensions, asset URLs.
 
 1. If `sectionHint` given → look in `src/features/*/components/{sectionHint}/`
 2. Search `src/features/` for matching component names or layer names
-3. Read each found component file + its BEM classes in the page CSS file
+3. Read each found component file + the page CSS file for typography classes
 4. Read the page CSS file for typography utility classes
 
 ### Step 5 — Diff Against Figma
@@ -67,14 +67,14 @@ Compare node by node. Check for:
 | Category | What to check |
 |----------|---------------|
 | **rem values** | All dimensions must use rem, not px. Flag any hardcoded px. |
-| **BEM classes** | Styles should be in CSS file as BEM, not inline Tailwind strings |
+| **Tailwind classes** | Styles should use Tailwind utility classes in JSX, not inline styles |
 | **Typography** | Must use utility classes (pc-h2-54-s), not raw font values |
 | **Font matching** | Font family must match Figma — check if correct font is loaded |
 | **Layout** | Flex direction, gap, alignment, padding, margin |
 | **Colors** | Background, text, border — exact hex from Figma tokens |
 | **Spacing** | Padding, margin, gap — recalculate rem from Figma px |
 | **Assets** | Flag any `figma.com/api/mcp/asset/` URLs (expired!) |
-| **Inline styles** | Flag any `style={{ }}` that should be BEM/Tailwind |
+| **Inline styles** | Flag any `style={{ }}` that should be Tailwind classes |
 | **Naming** | Flag Vietnamese in variable/class names |
 | **Semantic HTML** | Check div-soup, missing semantic elements |
 | **H1 count** | Verify only one H1 on the page |
@@ -86,7 +86,7 @@ Produce a prioritized diff list:
 [CRITICAL] Root uses w-[1600px] → must use rem-based width
 [ASSET] hero-banner.webp uses expired Figma URL → download to public/
 [FONT] SVN-Gilroy not loaded → install via @fontsource or Google Fonts
-[STYLE] .hero__title uses inline fontSize → move to BEM class with pc-h1-64-eb
+[STYLE] .hero__title uses inline fontSize → use pc-h1-64-eb Tailwind class in JSX
 [NAMING] variable "tieuDe" → rename to "heading"
 [FIX] .hero__description color #666 → should be #4A4A4A per Figma
 [MISSING] CTA secondary button exists in Figma but not in code
@@ -106,7 +106,7 @@ If `issueDescription` was provided, tag related items with `[REPORTED]`:
 - Fix one item at a time using `Edit` (targeted replacement)
 - For font issues: try to acquire the correct font (Google Fonts → @fontsource → font files → closest alternative)
 - Download expired assets before updating references
-- Update BEM classes in the CSS file
+- Update Tailwind classes in the component JSX
 - Re-read each file after editing to verify the fix applied
 
 ### Step 7 — Visual Verification Loop
@@ -171,7 +171,7 @@ Figma frame: {width} × {height}px → {platform} (rem divisor: {divisor})
 2. **User's reported issue is top priority** — fix it first, then handle other diffs.
 3. **Always fetch fresh Figma data** — never use cached values.
 4. **All fixes use rem** — convert any remaining px to rem.
-5. **BEM classes over inline** — move inline styles to CSS file.
+5. **Tailwind classes over inline** — use Tailwind utility classes in JSX, not inline styles.
 6. **Typography utilities** — replace raw font values with pc-*/sp-* classes.
 7. **Fonts must match Figma** — acquire the correct font (Google → @fontsource → files → alternative).
 8. **Minimal edits** — change only what differs from Figma.

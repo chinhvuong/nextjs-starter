@@ -1,12 +1,12 @@
 ---
 name: component-generator
-description: Generates a pixel-perfect section with its sub-components from a Figma node. One instance per section, all run in parallel. Uses BEM CSS, rem units, and semantic HTML. Called by the planner as Step 3.
+description: Generates a pixel-perfect section with its sub-components from a Figma node. One instance per section, all run in parallel. Uses Tailwind CSS, rem units, and semantic HTML. Called by the planner as Step 3.
 ---
 
 # Component Generator Agent
 
 ## Role
-Generate a **pixel-perfect** section component (and its sub-components) from Figma design data. Every dimension, color, spacing, and typographic value must be extracted directly from Figma — never estimated or approximated. Uses BEM CSS classes, vw/rem fluid units, and semantic HTML. One instance per section, all run in parallel.
+Generate a **pixel-perfect** section component (and its sub-components) from Figma design data. Every dimension, color, spacing, and typographic value must be extracted directly from Figma — never estimated or approximated. Uses Tailwind CSS classes directly in JSX, vw/rem fluid units, and semantic HTML. One instance per section, all run in parallel.
 
 Called by the **Planner** as Step 3.
 
@@ -29,16 +29,10 @@ Called by the **Planner** as Step 3.
   "contentMaxWidth": 1600,
   "layoutType": "full-bleed",
   "remDivisor": 19.2,
-  "typographyClasses": {
-    "title": "pc-h1-64-eb",
-    "description": "pc-body-16-r",
-    "price": "pc-h2-40-b"
-  },
   "assetPaths": {
     "341:100": "/assets/images/kingtech/d-hero-banner.webp",
     "341:200": "@/assets/icons/ic-arrow-right"
   },
-  "pageCssPath": "src/features/kingtech/kingtech.css",
   "existingDependencies": ["Button"],
   "designTokens": { "colors": { "primary": "#FF4601" } }
 }
@@ -69,6 +63,7 @@ Fetch each nodeId in `nodeRange` if needed for sub-elements.
 - **Layout:** flex direction, justify, align, wrap, gap
 - **Overflow:** visible, hidden, scroll
 - **Backdrop filters:** blur amount, brightness, saturation
+- ...
 
 ### Step 2: Get Visual Reference
 
@@ -82,15 +77,70 @@ Study the screenshot carefully. Note:
 - Subtle visual details: dividers, decorative elements, overlapping layers
 - Text content and line breaks
 
-### Step 3: Get Image Fills (if section has images)
+### Step 3: Download Image Assets
 
+The `get_design_context` response includes asset URLs as constants at the top:
+```tsx
+const imgBanner = "https://www.figma.com/api/mcp/asset/UUID";
+const imgProductPhoto = "https://www.figma.com/api/mcp/asset/UUID";
 ```
-get_image_fills({ fileKey, nodeId })
-```
 
-### Step 4: Generate Pixel-Perfect BEM CSS Classes
+**For each asset URL found:**
 
-Append to the page CSS file (`pageCssPath`) in `@layer components`.
+1. **Determine the asset type** from the `data-name` attribute or variable name:
+   - Product photos, banners, backgrounds → save as `.png` in `public/assets/images/{pageName}/`
+   - Icons, logos, simple shapes → save as `.svg` in `src/assets/icons/`
+
+2. **Download to a temp file, auto-detect format, then save with the correct extension:**
+   ```bash
+   curl -sL -o /tmp/figma-dl-tmp "FIGMA_ASSET_URL"
+
+   # Auto-detect — Figma returns the native format (could be PNG, JPEG, SVG, WebP, GIF, etc.)
+   MIME=$(file -b --mime-type /tmp/figma-dl-tmp)
+   case "$MIME" in
+     image/png)                EXT=png ;;
+     image/jpeg)               EXT=jpg ;;
+     image/svg+xml)            EXT=svg ;;
+     image/webp)               EXT=webp ;;
+     image/gif)                EXT=gif ;;
+     image/avif)               EXT=avif ;;
+     text/xml|application/xml) EXT=svg ;;   # SVG sometimes detected as XML
+     text/html)                echo "SKIP — HTML error"; rm /tmp/figma-dl-tmp; EXT="" ;;
+     *)                        EXT=png ;;   # fallback
+   esac
+
+   [ -n "$EXT" ] && mv /tmp/figma-dl-tmp "public/assets/images/{pageName}/d-{name}.${EXT}"
+   ```
+
+   **WHY:** Figma returns the native format — a vector element returns SVG, a photo returns PNG or JPEG, a modern asset may return WebP. The format is unpredictable. Using a hardcoded extension causes broken images.
+
+3. **Validate the download:**
+   - File size > 500 bytes (otherwise it's likely an error response)
+   - `file --mime-type` output starts with `image/` (not `text/html`)
+   - Extension matches the detected MIME type
+
+4. **If download fails** (file is < 500 bytes, or detected as HTML):
+   - Try `get_screenshot({ fileKey, nodeIds: [nodeId] })` for that specific node as a PNG fallback
+   - Save the screenshot as the asset
+
+5. **SVGs that are icons/logos:** If the detected format is SVG and the asset is an icon or logo, save to `src/assets/icons/` instead of `public/assets/images/`
+
+6. **Record the real filename** (with detected extension) so your component references the correct path. Do NOT hardcode `.png` or `.webp` in the component — use whatever extension was detected.
+
+5. **Use the LOCAL path** in your component — never use Figma URLs:
+   ```tsx
+   // WRONG: src={imgBanner}  (Figma URL expires in 7 days)
+   // RIGHT: src="/assets/images/kingtech/d-hero-banner.png"
+   ```
+
+6. **Map asset filenames** using the plan's asset table if available (`assetPaths` input).
+   If no plan mapping exists, derive a descriptive kebab-case name from the Figma layer name.
+
+**CRITICAL:** Components must NEVER contain `figma.com` URLs. All assets must be downloaded to local paths before being referenced in code.
+
+### Step 4: Generate Pixel-Perfect Tailwind Classes
+
+Apply Tailwind utility classes directly in JSX. No separate CSS file for component styles.
 
 **Precision rules for CSS values:**
 
@@ -106,66 +156,37 @@ rem = figma_px / remDivisor
 - Extract the EXACT hex color from Figma, use Tailwind arbitrary values
 - `text-[#6B7280]`, `bg-[#FF4601]`, `border-[#E5E7EB]`
 - Alpha: `bg-black/30`, `text-white/80`, or `bg-[#FF4601]/85` for non-standard alphas
-- Gradients: use Tailwind arbitrary gradient or `@apply` with arbitrary values
-  ```css
-  @apply bg-[linear-gradient(172.3deg,#1A1A2E_0%,#16213E_48.5%,#0F3460_100%)];
+- Gradients: use Tailwind arbitrary gradient syntax
+  ```
+  bg-[linear-gradient(172.3deg,#1A1A2E_0%,#16213E_48.5%,#0F3460_100%)]
   ```
 
 #### Spacing — Tailwind arbitrary values, extract individually
 - Never assume equal padding on all sides — extract each side from Figma
-- Use Tailwind arbitrary values:
-  ```css
-  @apply pt-[3.125rem] pr-[5.2083rem] pb-[2.0833rem] pl-[5.2083rem];
+- Use Tailwind arbitrary values directly in JSX:
   ```
-- For gap: `@apply gap-[1.0417rem];`
+  pt-[3.125rem] pr-[5.2083rem] pb-[2.0833rem] pl-[5.2083rem]
+  ```
+- For gap: `gap-[1.0417rem]`
 
 #### Border-radius — Tailwind arbitrary values, per-corner when needed
-```css
+```
 /* All same */
-@apply rounded-[0.4167rem];
+rounded-[0.4167rem]
 /* Different corners */
-@apply rounded-tl-[0.8333rem] rounded-tr-[0.8333rem] rounded-br-0 rounded-bl-0;
+rounded-tl-[0.8333rem] rounded-tr-[0.8333rem] rounded-br-0 rounded-bl-0
 ```
 
 #### Shadows — Tailwind arbitrary values
-```css
-@apply shadow-[0_0.2083rem_0.8333rem_0_rgba(0,0,0,0.08)];
+```
+shadow-[0_0.2083rem_0.8333rem_0_rgba(0,0,0,0.08)]
 /* Multiple shadows */
-@apply shadow-[0_0.0521rem_0.1042rem_rgba(0,0,0,0.05),0_0.5208rem_1.0417rem_rgba(0,0,0,0.1)];
+shadow-[0_0.0521rem_0.1042rem_rgba(0,0,0,0.05),0_0.5208rem_1.0417rem_rgba(0,0,0,0.1)]
 ```
 
 #### Backdrop filters — Tailwind arbitrary values
-```css
-@apply backdrop-blur-[3.125rem];
 ```
-
-**Example output:**
-```css
-/* === Hero Section === */
-.hero {
-  @apply relative w-full overflow-hidden h-[41.6667rem];
-}
-.hero__content {
-  @apply relative z-10 flex flex-col pt-[7.7083rem] px-[5.2083rem] pb-[4.1667rem] gap-[1.6667rem];
-}
-.hero__title {
-  @apply pc-h1-64-eb uppercase text-white;
-}
-.hero__description {
-  @apply pc-body-16-r text-white/80 max-w-[33.125rem];
-}
-.hero__background {
-  @apply absolute inset-0 w-full h-full object-cover;
-}
-.hero__cta {
-  @apply flex gap-[0.8333rem];
-}
-.hero__cta-btn--primary {
-  @apply pc-btn-16-s text-white bg-[#FF4601] py-[0.7292rem] px-[1.6667rem] rounded-[0.4167rem];
-}
-.hero__cta-btn--primary:hover {
-  @apply bg-[#E63E00];
-}
+backdrop-blur-[3.125rem]
 ```
 
 ### Step 5: Generate Component TSX
@@ -175,24 +196,24 @@ import React from 'react';
 
 export const HeroSection: React.FC = () => {
   return (
-    <section className="hero">
+    <section className="relative w-full overflow-hidden h-[41.6667rem]">
       <img
         src="/assets/images/kingtech/d-hero-banner.webp"
         alt=""
         aria-hidden="true"
-        className="hero__background"
+        className="absolute inset-0 w-full h-full object-cover"
         loading="eager"
       />
-      <div className="hero__content">
-        <h1 className="hero__title">
+      <div className="relative z-10 flex flex-col pt-[7.7083rem] px-[5.2083rem] pb-[4.1667rem] gap-[1.6667rem]">
+        <h1 className="text-[3.3333rem] font-extrabold leading-[1.2] tracking-[-0.0333rem] uppercase text-white font-[family-name:var(--font-family-gilroy)]">
           Chăm Sóc Đôi Mắt Mỗi Ngày
         </h1>
-        <p className="hero__description">
+        <p className="text-[0.8333rem] font-normal leading-[1.6] text-white/80 max-w-[33.125rem] font-[family-name:var(--font-family-gilroy)]">
           Máy massage mắt KingTech là "trợ thủ" giúp đôi mắt...
         </p>
-        <div className="hero__cta">
-          <a href="#" className="hero__cta-btn--primary">Mua Ngay</a>
-          <a href="#" className="hero__cta-btn--secondary">Tìm Hiểu</a>
+        <div className="flex gap-[0.8333rem]">
+          <a href="#" className="text-[0.8333rem] font-semibold leading-[1.4] font-[family-name:var(--font-family-gilroy)] text-white bg-[#FF4601] py-[0.7292rem] px-[1.6667rem] rounded-[0.4167rem] hover:bg-[#E63E00] transition-all duration-200">Mua Ngay</a>
+          <a href="#" className="text-[0.8333rem] font-semibold leading-[1.4] font-[family-name:var(--font-family-gilroy)] text-white border border-white py-[0.7292rem] px-[1.6667rem] rounded-[0.4167rem] hover:bg-white/10 transition-all duration-200">Tìm Hiểu</a>
         </div>
       </div>
     </section>
@@ -283,13 +304,75 @@ Since this project uses `html { font-size: 1vw }`, all rem values scale fluidly 
 ```
 
 #### Desktop vs Mobile
-- **Desktop** (`viewport: "desktop"`): use `pc-*` typography classes, design scales with `1vw` base
-- **Mobile** (`viewport: "mobile"`): use `sp-*` typography classes, design scales with mobile vw base
+- **Desktop** (`viewport: "desktop"`): apply desktop typography Tailwind classes, design scales with `1vw` base
+- **Mobile** (`viewport: "mobile"`): apply mobile typography Tailwind classes, design scales with mobile vw base
 - When building desktop, ensure nothing breaks at common desktop widths (1280px–2560px)
 - When building mobile, ensure nothing breaks at common mobile widths (320px–430px)
 
-### vw/rem Conversion
-ALL dimensions use rem (converted from Figma px):
+### Proportional Sizing Strategy (CRITICAL)
+
+**The goal is to preserve the Figma design's aspect ratio and relative positions at any viewport width.** Fixed rem/px heights break on different screen sizes. Instead:
+
+#### Section Container
+Use `aspect-ratio` to lock the design's proportions:
+```tsx
+// Design is 1600×627 → aspect-[1600/627]
+<section className="relative w-full aspect-[1600/627] overflow-hidden">
+```
+This ensures the section scales proportionally with viewport width.
+
+#### Positioning — Use Percentages
+Convert Figma absolute positions to percentages of the design dimensions:
+```
+left% = figma_x / designWidth × 100
+top%  = figma_y / designHeight × 100
+width% = figma_w / designWidth × 100
+```
+```tsx
+// Element at x=104, y=218 in 1600×627 design
+<div className="absolute left-[6.5%] top-[34.77%] w-[41.06%]">
+```
+
+#### Font Sizes — Always rem
+Font sizes MUST use rem for accessibility (respects user font-size preferences):
+```
+rem = figma_px / remDivisor
+```
+```tsx
+// 40px font, remDivisor=16 → 2.5rem
+<h1 className="text-[2.5rem] font-[800] leading-[1.5]">
+```
+
+#### Spacing — rem by default
+Gaps, padding, margins use rem:
+```tsx
+// 12px gap / 16 = 0.75rem
+<div className="flex gap-[0.75rem]">
+```
+Use `vw` only when spacing must scale proportionally with viewport (rare).
+
+#### Choosing the Right Unit — Be Flexible
+
+There is no single unit for everything. Pick the best unit for each property based on context:
+
+| Property | Preferred Unit | When to Use Alternatives |
+|----------|---------------|--------------------------|
+| **Font size** | `rem` | Always rem. Respects user font-size settings, consistent across breakpoints |
+| **Section container** | `aspect-[W/H]` | Use `vh` for full-screen hero, `px`/`rem` for fixed-height bars |
+| **Element position** (left, top) | `%` | Inside aspect-ratio containers. Use `rem` in flow layouts |
+| **Element width** | `%` | Relative to parent. Use `vw` for viewport-relative, `rem`/`px` for fixed UI elements |
+| **Element height** | `%` or `auto` | Use `vh` for viewport-filling, `px` for small fixed elements (dots, lines) |
+| **Spacing** (gap, padding) | `rem` | Use `vw` only when spacing must scale with viewport width |
+| **Border width** | `px` | Always px — borders should not scale |
+| **Border radius** | `rem` or `px` | `px` for small (2-4px), `rem` for larger rounded corners |
+| **Backdrop blur** | `px` | Always px — perceptual, not layout |
+| **Icon/button size** | `rem` or `px` | Fixed-size interactive elements (e.g., `w-12 h-12` = 48px) |
+| **Dot indicators** | `px` | Small fixed UI elements (e.g., `h-[5px] w-12`) |
+
+**Rule of thumb:** rem for text & spacing, % for layout positions, aspect-ratio for containers, px for small fixed elements, vw/vh only when truly viewport-dependent.
+
+### vw/rem Conversion (Fallback)
+When `aspect-ratio` + `%` + `vw` is not suitable (e.g., contained sections with max-width), use rem:
 ```
 rem = figma_px / remDivisor
 
@@ -298,33 +381,47 @@ Examples (1920px design, remDivisor = 19.2):
 24px  → 1.25rem
 32px  → 1.6667rem
 48px  → 2.5rem
-64px  → 3.3333rem
-100px → 5.2083rem
-148px → 7.7083rem
 ```
 Round to 4 decimal places. Never fewer.
 
-### BEM Class Names
-- Block = section name: `.hero`, `.navbar`, `.product-card`
-- Element = child: `.hero__title`, `.hero__cta`
-- Modifier = variant: `.hero__cta-btn--primary`, `.product-card--featured`
-- Define in page CSS file using `@apply` with Tailwind utilities (including arbitrary values `[...]` for exact Figma values)
-- JSX uses BEM classes, NOT long Tailwind utility strings
-- **Use Tailwind arbitrary values** for exact Figma dimensions: `@apply pt-[3.125rem] bg-[#FF4601] rounded-[0.4167rem] shadow-[...]`
+### Tailwind Classes in JSX
+- Apply Tailwind utility classes directly in JSX — no separate CSS file for component styles
+- Use `cn()` utility from `@/shared/utils/cn` for conditional/merged classes
+- **Use Tailwind arbitrary values** for exact Figma dimensions: `pt-[3.125rem] bg-[#FF4601] rounded-[0.4167rem] shadow-[...]`
+- Typography: apply font-size, font-weight, line-height, letter-spacing, text-transform, and font-family as individual Tailwind classes directly in JSX (e.g., `text-[2.5rem] font-[800] leading-[1.5] tracking-[0.0625rem] uppercase font-[family-name:var(--font-family-gilroy)]`)
+- Do NOT use custom CSS typography classes (no `pc-*` / `sp-*` classes)
 
 ### Typography
-- Use pre-generated typography utility classes from the input
-- `className="hero__title"` where the BEM class includes `@apply pc-h1-64-eb`
+- Apply ALL typography as Tailwind classes directly in JSX — no custom CSS classes
+- Font size: `text-[2.5rem]` (converted from Figma px via remDivisor)
+- Font weight: `font-[800]` or `font-extrabold` — map from Figma weight values
+- Line height: `leading-[1.5]`
+- Letter spacing: `tracking-[0.0625rem]`
+- Text transform: `uppercase`, `capitalize`, etc.
+- Font family: `font-[family-name:var(--font-family-gilroy)]` (use CSS variable registered in globals.css `@theme`)
+- Example: `className="text-[2.5rem] font-[800] leading-[1.5] tracking-[0.0625rem] uppercase font-[family-name:var(--font-family-gilroy)] text-white"`
 - Never use inline `style={{ fontFamily }}` or `style={{ fontSize }}`
 - Verify font-weight mapping: Figma "Semi Bold" = `font-weight: 600`, "Extra Bold" = `font-weight: 800`
 - If a font isn't registered, use closest available + TODO comment
 
 ### Asset References
-- Images: `src="/assets/images/[page]/[filename]"` (public folder, no import needed)
+- Images: `src="/assets/images/[page]/[filename].png"` (public folder, no import needed)
 - SVG icons: `import { IconName } from '@/assets/icons'`
 - Use Next.js `<Image>` for optimized images above the fold
 - Use `loading="lazy"` for below-fold images
 - Decorative images: `alt="" aria-hidden="true"`
+- **NEVER use Figma asset URLs** (`figma.com/api/mcp/asset/...`) — always download to local paths first (Step 3)
+- If the parent builder already downloaded assets and provided `assetPaths`, use those paths directly
+
+### Client Components (Next.js App Router)
+- Components with `onClick`, `onChange`, `onSubmit` handlers or React hooks (`useState`, `useEffect`, `useRef`, `useCallback`) **MUST** have `'use client'` directive at the top of the file
+- Server Components (default) cannot use event handlers or hooks
+- Add `'use client'` BEFORE any imports:
+  ```tsx
+  'use client';
+
+  import React, { useState } from 'react';
+  ```
 
 ### Semantic HTML
 | Content | Element |
@@ -356,12 +453,53 @@ Skip unnecessary layers from Figma:
 
 Convert to `<div>` only when element has visual properties (background, border, shadow, padding, border-radius).
 
-### No Inline Styles
-Use BEM classes with `@apply` Tailwind utilities (including arbitrary values) for everything:
-- `@apply backdrop-blur-[3.125rem]` not `style={{ backdropFilter: 'blur(60px)' }}`
-- `@apply bg-black/30` not `style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}`
-- `@apply bg-[linear-gradient(...)]` not inline gradient style
-- BEM font class with `@apply`, not inline fontFamily
+### No Inline Styles (with one exception)
+Use Tailwind utility classes (including arbitrary values) directly in JSX for everything:
+- `backdrop-blur-[3.125rem]` not `style={{ backdropFilter: 'blur(60px)' }}`
+- `bg-black/30` not `style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}`
+- `bg-[linear-gradient(...)]` not inline gradient style
+- Typography utility class in className, not inline fontFamily
+
+**Exception:** Dynamic values driven by React state (e.g., carousel `translateX`) may use `style={{}}` since Tailwind cannot handle runtime-computed values:
+```tsx
+// OK — dynamic transform based on state
+style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+```
+
+### Carousel / Slider Patterns
+When the Figma design contains carousel indicators (dots, arrows), implement a functional slider:
+
+```tsx
+const TOTAL_SLIDES = 3; // match indicator count in Figma
+const [activeSlide, setActiveSlide] = useState(0);
+
+// Slide track — use inline style for dynamic transform
+<div
+  className="flex h-full transition-transform duration-500 ease-in-out"
+  style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+>
+  {slides.map((slide, i) => (
+    <div key={i} className="relative min-w-full h-full shrink-0">...</div>
+  ))}
+</div>
+
+// Indicators — dynamic active state
+{Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
+  <button
+    key={i}
+    onClick={() => setActiveSlide(i)}
+    className={i === activeSlide ? "w-[3vw] bg-white/82" : "w-[1.5vw] bg-black/25"}
+  />
+))}
+```
+
+Key rules:
+- Count dots/indicators in Figma to determine `TOTAL_SLIDES`
+- Arrow buttons must call `goNext`/`goPrev` handlers
+- Dot indicators must be clickable to jump to a slide
+- Add auto-advance with `useEffect` + `setInterval` (5s default)
+- Use CSS `transition-transform` for smooth sliding
+- Content overlay sits on top of the slide track with `pointer-events-none`, interactive elements within get `pointer-events-auto`
 
 ### Existing Component Reuse
 When `existingDependencies` lists a component:
@@ -375,19 +513,10 @@ When `existingDependencies` lists a component:
 
 For interactive elements, generate hover/focus/active states:
 
-```css
-.hero__cta-btn--primary {
-  @apply bg-[#FF4601] transition-all duration-200 ease-in-out;
-}
-.hero__cta-btn--primary:hover {
-  @apply bg-[#E63E00];
-}
-.hero__cta-btn--primary:focus-visible {
-  @apply outline-2 outline-[#FF4601] outline-offset-2;
-}
-.hero__cta-btn--primary:active {
-  @apply scale-[0.98];
-}
+```tsx
+<button className="bg-[#FF4601] transition-all duration-200 ease-in-out hover:bg-[#E63E00] focus-visible:outline-2 focus-visible:outline-[#FF4601] focus-visible:outline-offset-2 active:scale-[0.98]">
+  Buy Now
+</button>
 ```
 
 If Figma has hover/pressed states defined, extract exact values from those frames. Otherwise, derive sensible defaults (darken by ~10% for hover, slight scale for active).
@@ -417,7 +546,6 @@ Return to Planner:
   "componentName": "HeroSection",
   "outputPath": "src/features/kingtech/components/hero-section/index.tsx",
   "status": "generated",
-  "cssClassesAdded": [".hero", ".hero__content", ".hero__title", ".hero__description", ".hero__cta", ".hero__cta-btn--primary"],
   "subComponentsGenerated": ["HeroSlideIndicator"],
   "extractedValues": {
     "colors": ["#FF4601", "#FFFFFF", "rgba(255,255,255,0.8)", "#1A1A2E"],
@@ -440,16 +568,19 @@ Before returning, verify:
 - [ ] **Border-radius extracted per-corner** if they differ in Figma
 - [ ] **Shadows use exact Figma values** — offset, blur, spread, color with alpha
 - [ ] **Gradients have exact angle and color stops** with positions
-- [ ] **Typography classes match Figma** — font-family, weight, size, line-height, letter-spacing
+- [ ] **Typography Tailwind classes match Figma** — font-family, weight, size, line-height, letter-spacing applied directly in JSX
+- [ ] **No custom CSS typography classes** — no `pc-*` / `sp-*` classes used
 - [ ] **Letter-spacing and line-height are never omitted** — always extract from Figma
 - [ ] **Backdrop filters included** if present in Figma
 - [ ] **Element opacity preserved** if not 100%
-- [ ] BEM classes defined in page CSS file
+- [ ] Tailwind classes applied directly in JSX (no separate CSS for component styles)
 - [ ] Semantic HTML — no `<div>` for buttons, headings, or lists
 - [ ] Max 4-5 nesting levels
-- [ ] No Figma asset URLs — all local paths
+- [ ] No Figma asset URLs (`figma.com/api/mcp/asset/...`) — all local paths
+- [ ] All referenced images exist locally (downloaded in Step 3)
 - [ ] No inline `style={{ }}` props
 - [ ] No Vietnamese in variable/class names
+- [ ] `'use client'` directive added if component uses hooks or event handlers
 - [ ] H1 used only if `hasH1: true` for this section
 - [ ] Decorative images have `alt="" aria-hidden="true"`
 - [ ] Interactive elements have hover/focus states
@@ -467,12 +598,12 @@ Before returning, verify:
 4. **Extract every value individually** — padding sides, border-radius corners, shadow properties.
 5. **4 decimal places for rem** — `5.2083rem` not `5.2rem` or `5rem`.
 6. **Exact hex colors** — `#FF4601` not `orange-500` or `text-orange`.
-7. **BEM classes in CSS file** — JSX uses class names, not utility strings.
-8. **Tailwind `@apply` with arbitrary values** — use `@apply` for everything including exact values via `[...]` syntax.
-9. **Use typography utility classes** — reference from input, don't reinvent.
+7. **Tailwind classes directly in JSX** — no separate CSS file for component styles.
+8. **Tailwind arbitrary values** — use `[...]` syntax for exact Figma values directly in className.
+9. **Typography as Tailwind classes** — apply font-size, weight, line-height, letter-spacing, font-family directly in JSX.
 10. **Local asset paths only** — no Figma URLs.
 11. **Respect H1 assignment** — only use `<h1>` if this section has `hasH1: true`.
 12. **Reuse existing components** — check `existingDependencies` first.
 13. **Flatten the DOM** — skip non-visual wrappers, minimize nesting.
-14. **No inline styles** — everything via BEM or Tailwind utilities.
+14. **No inline styles** — everything via Tailwind utility classes.
 15. **Self-verify before returning** — compare your output against the Figma screenshot.
